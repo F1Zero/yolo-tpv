@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#157b8a" />
+  <title>YOLO TPV</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- ===== Barra superior ===== -->
+  <header class="topbar">
+    <button class="icon-btn" id="btnBack" hidden aria-label="Volver">‹</button>
+    <div class="brand"><img class="brand-logo" src="assets/logo.png" alt="YOLO" /><span class="sub">TPV</span></div>
+    <div class="top-actions">
+      <span class="net-badge" id="netBadge" title="Estado de conexión">●</span>
+      <button class="icon-btn" id="btnMenu" aria-label="Menú">☰</button>
+    </div>
+  </header>
+
+  <!-- ===== Vista: Notas abiertas ===== -->
+  <main id="viewNotas" class="view">
+    <div class="view-head">
+      <h1>Notas abiertas</h1>
+      <button class="btn primary" id="btnNueva">+ Nueva nota</button>
+    </div>
+    <div id="listaNotas" class="notas-grid"></div>
+    <p id="notasVacio" class="vacio" hidden>No hay notas abiertas. Toca “Nueva nota” para empezar.</p>
+  </main>
+
+  <!-- ===== Vista: Nota (catálogo + carrito) ===== -->
+  <main id="viewNota" class="view" hidden>
+    <section class="catalogo">
+      <div class="buscador">
+        <input type="search" id="buscar" placeholder="Buscar producto…" autocomplete="off" />
+      </div>
+      <div class="categorias" id="categorias"></div>
+      <div class="productos-grid" id="productos"></div>
+    </section>
+
+    <aside class="carrito">
+      <div class="carrito-head">
+        <div>
+          <div class="nota-titulo">Nota <span id="cNfactura">—</span></div>
+          <div class="nota-sub">Mesa <span id="cMesa">—</span> · <span id="cAtendio">—</span></div>
+        </div>
+        <button class="link-btn" id="btnEditarNota">editar</button>
+      </div>
+
+      <div class="lineas" id="lineas"></div>
+      <p class="vacio small" id="lineasVacio">Agrega productos tocándolos en el catálogo.</p>
+
+      <div class="totales">
+        <div class="row"><span>Subtotal</span><span id="tSubtotal">$0.00</span></div>
+        <div class="row"><span>IVA 16%</span><span id="tIva">$0.00</span></div>
+        <div class="row descuento-row">
+          <span>Descuento
+            <select id="descPct" class="mini-select">
+              <option value="0">0%</option><option value="5">5%</option>
+              <option value="10">10%</option><option value="15">15%</option>
+              <option value="20">20%</option>
+            </select>
+          </span>
+          <span id="tDescuento">-$0.00</span>
+        </div>
+        <div class="row total"><span>Total</span><span id="tTotal">$0.00</span></div>
+      </div>
+
+      <div class="carrito-sec">
+        <button class="btn ghost mini" id="btnComanda">🍳 Comanda</button>
+        <button class="btn ghost mini" id="btnImprimir">🖨️ Cuenta</button>
+        <button class="btn ghost mini" id="btnSeparar">✂️ Separar</button>
+      </div>
+      <div class="carrito-acciones">
+        <button class="btn ghost" id="btnCancelarNota">Cancelar</button>
+        <button class="btn primary grande" id="btnCobrar">Cobrar</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ===== Vista: Productos (catálogo / fotos) ===== -->
+  <main id="viewProductos" class="view" hidden>
+    <div class="view-head">
+      <h1>Productos</h1>
+      <button class="btn primary" id="btnNuevoProd">+ Nuevo</button>
+    </div>
+    <div class="buscador prod-buscador">
+      <input type="search" id="buscarProd" placeholder="Buscar producto…" autocomplete="off" />
+    </div>
+    <div id="listaProductos" class="prod-lista"></div>
+  </main>
+
+  <!-- ===== Vista: Consultar precios (solo lectura) ===== -->
+  <main id="viewPrecios" class="view" hidden>
+    <div class="view-head"><h1>Consultar precios</h1></div>
+    <div class="buscador prod-buscador">
+      <input type="search" id="buscarPrecio" placeholder="Buscar producto…" autocomplete="off" />
+    </div>
+    <div id="listaPrecios" class="precios-lista"></div>
+  </main>
+
+  <!-- ===== Vista: Corte de caja ===== -->
+  <main id="viewCorte" class="view" hidden>
+    <div class="view-head"><h1>Corte de caja</h1><span id="corteFecha" class="corte-fecha"></span></div>
+    <div class="corte-wrap">
+      <label class="corte-apertura">Apertura de caja (fondo)
+        <input id="corteApertura" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
+      </label>
+      <div id="corteResumen" class="corte-resumen"></div>
+      <label class="corte-campo">Disposición de efectivo (otros)
+        <input id="corteOtros" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
+      </label>
+      <label class="corte-campo">Motivo de la disposición
+        <input id="corteMotivo" type="text" placeholder="Ej. OXXO, compra insumos…" />
+      </label>
+      <div class="corte-entregar">
+        <span>Efectivo a entregar</span><b id="corteEntregar">$0.00</b>
+      </div>
+      <button class="btn primary grande" id="btnGuardarCorte">Guardar corte del día</button>
+      <p class="corte-hist-t">Cortes recientes</p>
+      <div id="corteHist" class="corte-hist"></div>
+    </div>
+  </main>
+
+  <!-- ===== Vista: Reportes ===== -->
+  <main id="viewReportes" class="view" hidden>
+    <div class="view-head"><h1>Reportes</h1></div>
+    <div class="rep-wrap">
+      <div class="rep-rango">
+        <label>Desde<input id="repDesde" type="date" /></label>
+        <label>Hasta<input id="repHasta" type="date" /></label>
+        <button class="btn primary" id="btnRepGenerar">Generar</button>
+      </div>
+      <div class="rep-quick">
+        <button class="chip" data-rango="hoy">Hoy</button>
+        <button class="chip" data-rango="semana">7 días</button>
+        <button class="chip" data-rango="mes">Mes</button>
+      </div>
+      <div id="repResumen" class="rep-resumen"></div>
+      <div id="repGraficas" class="rep-graficas"></div>
+      <div id="repTop" class="rep-top"></div>
+    </div>
+  </main>
+
+  <!-- input oculto para tomar/elegir foto -->
+  <input type="file" id="fileFoto" accept="image/*" hidden />
+
+  <!-- ===== Modal: editar producto ===== -->
+  <dialog id="dlgProd">
+    <form method="dialog" class="dlg-form">
+      <h2 id="dlgProdTitulo">Editar producto</h2>
+      <div class="prod-edit-foto">
+        <div class="pe-foto" id="peFoto"></div>
+        <button type="button" class="btn ghost" id="btnCambiarFoto">📷 Cambiar foto</button>
+        <button type="button" class="link-btn" id="btnQuitarFoto">quitar</button>
+      </div>
+      <label>Nombre<input id="epNombre" type="text" required /></label>
+      <div class="grid2">
+        <label>Precio (con IVA)<input id="epPrecio" type="number" inputmode="decimal" step="0.5" min="0" required /></label>
+        <label>Categoría
+          <input id="epCategoria" type="text" list="cats" />
+          <datalist id="cats"></datalist>
+        </label>
+      </div>
+      <label class="check"><input id="epActivo" type="checkbox" checked /> Activo (visible en el TPV)</label>
+      <div class="dlg-acciones">
+        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn primary" id="btnGuardarProd" value="ok" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ===== Modal: datos de nota ===== -->
+  <dialog id="dlgNota">
+    <form method="dialog" class="dlg-form">
+      <h2 id="dlgNotaTitulo">Nueva nota</h2>
+      <label>Mesa
+        <input id="inpMesa" type="text" inputmode="text" placeholder="1, 2, Barra, Para llevar…" required />
+      </label>
+      <label>Atendió
+        <input id="inpAtendio" type="text" placeholder="Nombre del mesero" list="meseros" />
+        <datalist id="meseros"></datalist>
+      </label>
+      <div class="dlg-acciones">
+        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn primary" id="dlgNotaOk" value="ok" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ===== Modal: cobro ===== -->
+  <dialog id="dlgCobro">
+    <form method="dialog" class="dlg-form cobro">
+      <h2>Cobrar nota <span id="coNfactura"></span></h2>
+
+      <div class="cobro-grid">
+        <label>Descuento
+          <select id="coDescPct" class="mini-select">
+            <option value="0">0%</option><option value="5">5%</option>
+            <option value="10">10%</option><option value="15">15%</option><option value="20">20%</option>
+          </select>
+        </label>
+        <label>Propina
+          <select id="inpPropina" class="mini-select">
+            <option value="0">Sin propina</option>
+            <option value="10">10%</option><option value="15">15%</option><option value="20">20%</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="cobro-total">Total a pagar <b id="coTotal">$0.00</b></div>
+
+      <div class="pagos-split">
+        <div class="psplit-row">
+          <span class="psplit-lbl">💵 Efectivo</span>
+          <input id="pagEfectivo" class="psplit-inp" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
+        </div>
+        <div class="psplit-row">
+          <span class="psplit-lbl">💳 Tarjeta</span>
+          <input id="pagTarjeta" class="psplit-inp" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
+        </div>
+        <div class="psplit-row">
+          <span class="psplit-lbl">📲 Transfer.</span>
+          <input id="pagTransfer" class="psplit-inp" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
+        </div>
+        <button type="button" class="link-btn" id="btnPagoExacto">Pago exacto en efectivo</button>
+      </div>
+
+      <div class="cobro-resumen">
+        <div class="row"><span>Pagado</span><b id="coPagado">$0.00</b></div>
+        <div class="row" id="rowFalta"><span>Falta</span><b id="coFalta">$0.00</b></div>
+        <div class="row cambio"><span>Cambio</span><b id="coCambio">$0.00</b></div>
+      </div>
+
+      <div class="dlg-acciones">
+        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn primary" id="btnConfirmarCobro" value="ok" type="submit">Confirmar cobro</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ===== Menú lateral ===== -->
+  <div id="drawer" class="drawer" hidden>
+    <div class="drawer-panel">
+      <button class="drawer-item" data-nav="notas">🧾 Notas abiertas</button>
+      <button class="drawer-item" data-nav="precios">🔎 Consultar precios</button>
+      <button class="drawer-item" data-nav="corte">💰 Corte de caja</button>
+      <button class="drawer-item" data-nav="reportes">📊 Reportes</button>
+      <button class="drawer-item" data-nav="productos">☕ Productos</button>
+      <button class="drawer-item" data-nav="sync">⚙️ Sincronización</button>
+      <button class="drawer-item" data-nav="acerca">ℹ️ Acerca de</button>
+      <hr />
+      <div class="drawer-info">
+        <div>Folio actual: <b id="infoFolio">—</b></div>
+        <div>Productos: <b id="infoProd">—</b></div>
+        <div class="tag" id="infoSync">Solo local (Fase 1)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal: sincronización ===== -->
+  <dialog id="dlgSync">
+    <form method="dialog" class="dlg-form">
+      <h2>Sincronización con Google Sheets</h2>
+      <p class="sync-help">Pega la URL del Web App de Apps Script (termina en <code>/exec</code>).</p>
+      <label>URL del Web App
+        <input id="syncUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" />
+      </label>
+      <label>Token (igual al del script)
+        <input id="syncToken" type="text" placeholder="yolo-tpv-2026" />
+      </label>
+      <label class="check"><input id="syncOn" type="checkbox" /> Activar sincronización</label>
+      <div class="sync-estado" id="syncEstado"></div>
+      <div class="sync-botones">
+        <button type="button" class="btn ghost" id="btnProbarSync">Probar conexión</button>
+        <button type="button" class="btn ghost" id="btnSubirTodo">Subir todo ahora</button>
+      </div>
+      <div class="dlg-acciones">
+        <button class="btn ghost" value="cancel" type="submit">Cerrar</button>
+        <button class="btn primary" id="btnGuardarSync" value="ok" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ===== Modal: cobro exitoso ===== -->
+  <dialog id="dlgCobrado">
+    <div class="dlg-form cobrado">
+      <div class="ok-ico">✓</div>
+      <h2>Nota <span id="okNfactura"></span> cobrada</h2>
+      <div id="okResumen" class="ok-resumen"></div>
+      <div class="dlg-acciones">
+        <button class="btn ghost" id="btnCerrarCobrado">Listo</button>
+        <button class="btn primary" id="btnImprimirTicket">🖨️ Imprimir ticket</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ===== Modal: modificadores de comida ===== -->
+  <dialog id="dlgMod">
+    <form method="dialog" class="dlg-form">
+      <h2 id="modTitulo">Personalizar</h2>
+      <div id="modSalsa" class="mod-grupo">
+        <div class="mod-lbl">Salsa</div>
+        <div class="mod-ops">
+          <label class="mod-op"><input type="radio" name="salsa" value="" checked> Sin salsa</label>
+          <label class="mod-op"><input type="radio" name="salsa" value="Roja"> Roja</label>
+          <label class="mod-op"><input type="radio" name="salsa" value="Verde"> Verde</label>
+        </div>
+      </div>
+      <div class="mod-grupo">
+        <div class="mod-lbl">Aderezo</div>
+        <div class="mod-ops">
+          <label class="mod-op"><input type="radio" name="aderezo" value="Sin aderezos" checked> Sin aderezos</label>
+          <label class="mod-op"><input type="radio" name="aderezo" value="Jalapeño"> Jalapeño</label>
+          <label class="mod-op"><input type="radio" name="aderezo" value="Mayonesa chipotle"> Mayonesa chipotle</label>
+        </div>
+      </div>
+      <div class="mod-grupo">
+        <div class="mod-lbl">Extras</div>
+        <div class="mod-ops" id="modExtras"></div>
+      </div>
+      <label>Pedido especial (opcional)
+        <input id="modNota" type="text" placeholder="Ej. sin cebolla, término medio…" />
+      </label>
+      <div class="mod-total">Subtotal del platillo: <b id="modSub">$0.00</b></div>
+      <div class="dlg-acciones">
+        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn primary" id="modOk" value="ok" type="submit">Agregar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ===== Modal: separar cuenta ===== -->
+  <dialog id="dlgSeparar">
+    <form method="dialog" class="dlg-form">
+      <h2>Separar cuenta</h2>
+      <p class="sync-help">Marca los productos que pasan a una <b>cuenta nueva</b>. El resto se queda en esta nota.</p>
+      <div id="sepLineas" class="sep-lineas"></div>
+      <div class="sep-tot">
+        <span>Nueva cuenta: <b id="sepTotalNueva">$0.00</b></span>
+        <span>Queda: <b id="sepTotalQueda">$0.00</b></span>
+      </div>
+      <div class="dlg-acciones">
+        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn primary" id="sepOk" value="ok" type="submit">Separar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ===== Modal: Acerca de ===== -->
+  <dialog id="dlgAbout">
+    <div class="dlg-form about">
+      <div class="about-head">
+        <img src="assets/logo.png" alt="YOLO" class="about-logo">
+        <div>
+          <div class="about-name"><span>YOLO</span> <span class="about-name-2">TPV</span></div>
+          <div class="about-tag">Punto de venta de la cafetería YOLO</div>
+        </div>
+      </div>
+      <div class="about-creado">CREADO POR</div>
+      <div class="about-autor">Fernando E. Balmes Moguel</div>
+
+      <div class="about-sec"><h3>¿Qué es?</h3><p>YOLO TPV es el punto de venta de YOLO Coffee Shop: toma pedidos por mesa, imprime la comanda para cocina y la cuenta para el cliente, cobra en efectivo, tarjeta, transferencia o mixto, y hace el corte de caja diario. Funciona en PC, tablet y celular, incluso sin internet.</p></div>
+      <div class="about-sec"><h3>Automatizaciones</h3><p>Calcula el IVA y los totales solos, guarda cada venta al instante en el dispositivo y la sincroniza a Google Sheets cuando hay conexión, y archiva un PDF de cada nota en tu Google Drive automáticamente.</p></div>
+      <div class="about-sec"><h3>Tecnología</h3><p>Aplicación web (PWA) de desarrollo propio en HTML, CSS y JavaScript, con base de datos local IndexedDB y sincronización a Google Sheets mediante Google Apps Script. Sin frameworks ni servidores de terceros.</p></div>
+      <div class="about-sec"><h3>Privacidad</h3><p>Los datos del negocio (productos, notas, ventas) viven en tu dispositivo y en tu propia cuenta de Google. No hay publicidad, rastreadores ni analítica; nada se envía a servidores del desarrollador.</p></div>
+      <div class="about-sec"><h3>Avisos legales</h3><p>Software de desarrollo original del autor para uso de YOLO Coffee Shop. No está afiliado ni aprobado por Google; las marcas mencionadas pertenecen a sus dueños.</p></div>
+
+      <div class="about-pie">v1.0 · hecho en Mérida, México 🇲🇽</div>
+      <div class="dlg-acciones"><button class="btn primary" id="btnCerrarAbout">Cerrar</button></div>
+    </div>
+  </dialog>
+
+  <!-- Contenedor del ticket para impresión (oculto en pantalla, visible al imprimir) -->
+  <div id="ticketPrint" aria-hidden="true"></div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="js/catalogo.js"></script>
+  <script src="js/logo.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
