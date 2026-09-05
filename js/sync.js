@@ -97,6 +97,49 @@
     return resp.json();
   }
 
+  // ---- BAJAR (pull) y combinar el Sheet en la base local ----
+  function fixFecha(v) {
+    // el Sheet a veces devuelve la fecha como datetime ISO; la normalizamos a YYYY-MM-DD
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) {
+      const d = new Date(v);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    return v;
+  }
+  async function mergeTabla(store, rows, key, tsField, additiveOnly) {
+    if (!Array.isArray(rows)) return;
+    for (const raw of rows) {
+      const row = { ...raw };
+      if ('fecha' in row) row.fecha = fixFecha(row.fecha);
+      const k = row[key];
+      if (k === undefined || k === '' || k === null) continue;
+      const local = await DB.get(store, k);
+      if (additiveOnly) { if (!local) await DB.put(store, row); continue; }
+      const inTs = Number(row[tsField]) || 0;
+      const loTs = local ? (Number(local[tsField]) || 0) : -1;
+      if (!local || inTs >= loTs) await DB.put(store, row);
+    }
+  }
+  async function pull() {
+    if (!cfg.on || !cfg.url || !navigator.onLine) return { ok: false };
+    try {
+      const r = await fetch(cfg.url + (cfg.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(cfg.token) + '&action=pull', { mode: 'cors' });
+      const d = await r.json();
+      if (!d || !d.ok || !d.data) return { ok: false };
+      const x = d.data;
+      await mergeTabla('productos', x.productos, 'id', 'updated', true); // productos: solo agregar nuevos
+      await mergeTabla('notas', x.notas, 'nfactura', 'updated', false);
+      await mergeTabla('lineas', x.ventas, 'id', 'updated', false);
+      await mergeTabla('pagos', x.pagos, 'nfactura', 'fecha', false);
+      await mergeTabla('cortes', x.cortes, 'fecha', 'updated', false);
+      await DB.setMeta('pull_last', Date.now());
+      if (window.__afterPull) try { await window.__afterPull(); } catch (e) { }
+      return { ok: true };
+    } catch (e) { return { ok: false }; }
+  }
+  // primero sube lo pendiente, luego baja y combina
+  async function sincronizar() { await flush(); await pull(); }
+
   // Sube TODO lo local al Sheet (reconciliación / carga inicial).
   async function subirTodo() {
     if (!cfg.url) { toastSafe('Configura la URL primero'); return; }
@@ -136,9 +179,10 @@
   async function init() {
     await cargarCfg();
     actualizarBadge();
-    window.addEventListener('online', flush);
-    setInterval(() => { if (cfg.on) flush(); }, 30000); // reintento periódico
+    window.addEventListener('online', sincronizar);
+    if (cfg.on) sincronizar();                       // sube pendientes y baja el Sheet al abrir
+    setInterval(() => { if (cfg.on) sincronizar(); }, 25000); // subir + bajar cada 25s
   }
 
-  window.Sync = { init, enqueue, enqueuePDF, flush, subirTodo, probar, guardarCfg, cargarCfg, pendientes, get cfg() { return cfg; }, actualizarBadge };
+  window.Sync = { init, enqueue, enqueuePDF, flush, pull, sincronizar, subirTodo, probar, guardarCfg, cargarCfg, pendientes, get cfg() { return cfg; }, actualizarBadge };
 })();

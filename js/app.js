@@ -55,6 +55,11 @@
     await seedProductos();
     await aplicarFotosSeed();
     window.__toast = toast;
+    // al bajar datos del Sheet, refresca la vista visible (sin estorbar si hay una nota abierta)
+    window.__afterPull = async () => {
+      if (S.vista === 'notas') await renderNotas();
+      else if (S.vista === 'historial') await renderHistorial();
+    };
     if (window.Sync) await Sync.init();
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(() => { });
@@ -107,6 +112,7 @@
 
   // ---------- navegación ----------
   function mostrar(vista) {
+    S.vista = vista;
     $('#viewNotas').hidden = vista !== 'notas';
     $('#viewNota').hidden = vista !== 'nota';
     $('#viewProductos').hidden = vista !== 'productos';
@@ -158,7 +164,7 @@
       if (dlg.returnValue !== 'ok') return;
       const mesa = $('#inpMesa').value.trim() || 'S/M';
       const atendio = $('#inpAtendio').value.trim();
-      const nfactura = await DB.nextFolio();
+      const nfactura = await nuevoFolio();
       const nota = {
         nfactura, fecha: hoy(), mesa, atendio,
         estado: 'Abierta', subtotal: 0, iva: 0, desc_pct: 0, descuento: 0, total: 0,
@@ -1042,7 +1048,7 @@
   async function ejecutarSeparar() {
     const sel = [...$('#sepLineas').querySelectorAll('input:checked')].map((c) => S.lineas[+c.dataset.i]);
     if (!sel.length || sel.length === S.lineas.length) { toast('Elige algunos productos, no todos'); return; }
-    const nfactura = await DB.nextFolio();
+    const nfactura = await nuevoFolio();
     const tn = calcTotales(sel, 0);
     const nueva = {
       nfactura, fecha: hoy(), mesa: S.notaActual.mesa, atendio: S.notaActual.atendio,
@@ -1106,6 +1112,15 @@
 
   // ---------- helpers ----------
   function sync(tabla, op, data) { if (window.Sync) Sync.enqueue(tabla, op, { ...data }); }
+  // Folio único entre dispositivos: siguiente al máximo que exista localmente
+  // (tras sincronizar, local ya incluye las notas de los demás dispositivos).
+  async function nuevoFolio() {
+    const notas = await DB.all('notas');
+    const max = notas.reduce((m, n) => Math.max(m, Number(n.nfactura) || 0), FOLIO_INICIAL - 1);
+    const nuevo = max + 1;
+    await DB.setMeta('folio', nuevo);
+    return nuevo;
+  }
   function escapeAttr(s) { return escapeHtml(s).replace(/`/g, '&#96;'); }
   function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
   function escapeHtml(s) {
@@ -1143,8 +1158,8 @@
     $$('.drawer-item').forEach((b) => b.onclick = async () => {
       const nav = b.dataset.nav;
       cerrarDrawer();
-      if (nav === 'notas') { await renderNotas(); mostrar('notas'); }
-      else if (nav === 'historial') { await renderHistorial(); mostrar('historial'); }
+      if (nav === 'notas') { await renderNotas(); mostrar('notas'); if (window.Sync) Sync.sincronizar(); }
+      else if (nav === 'historial') { await renderHistorial(); mostrar('historial'); if (window.Sync) Sync.sincronizar(); }
       else if (nav === 'productos') { await renderProductosAdmin(); mostrar('productos'); }
       else if (nav === 'precios') { await renderPrecios(); mostrar('precios'); }
       else if (nav === 'corte') { await renderCorte(); mostrar('corte'); }
