@@ -1027,6 +1027,47 @@
     toast('Corte del día guardado');
     await renderCorteHist();
   }
+  // ticket imprimible del corte de caja (mismo formato térmico con logo)
+  function corteTicketHTML() {
+    const f = hoy();
+    const v = S._corteVentas || { ef: 0, tar: 0, tr: 0, total: 0, desc: 0, prop: 0, nNotas: 0, canceladas: 0 };
+    const ap = parseFloat($('#corteApertura').value) || 0;
+    const otros = parseFloat($('#corteOtros').value) || 0;
+    const motivo = $('#corteMotivo').value.trim();
+    const entregar = round2(ap + v.ef - otros);
+    const row = (k, val) => `<div class="tk-row"><span>${escapeHtml(k)}</span><span>${val}</span></div>`;
+    return `<div class="tk">
+      <img class="tk-logo" src="${NEGOCIO.logo}" onerror="this.style.display='none'">
+      <div class="tk-nom">${escapeHtml(NEGOCIO.nombre)}</div>
+      <div class="tk-fiscal">RFC: ${NEGOCIO.rfc}<br>Tel. ${NEGOCIO.telefono}</div>
+      <div class="tk-sep"></div>
+      <div class="tk-titulo">CORTE DE CAJA</div>
+      ${row('Fecha', f)}
+      ${row('Hora', (fechaTicket(Date.now()).split(' ')[1] || ''))}
+      <div class="tk-sep"></div>
+      ${row('Apertura de caja', money(ap))}
+      ${row('Notas cobradas', v.nNotas)}
+      ${row('Total de ventas', money(v.total))}
+      ${row('Efectivo', money(v.ef))}
+      ${row('Tarjeta', money(v.tar))}
+      ${row('Transferencia', money(v.tr))}
+      ${row('Descuentos', money(v.desc))}
+      ${row('Propinas', money(v.prop))}
+      ${row('Notas canceladas', v.canceladas)}
+      ${otros > 0 ? row('Disposición efectivo', money(otros)) : ''}
+      ${motivo ? row('Motivo', motivo) : ''}
+      <div class="tk-sep"></div>
+      <div class="tk-row tk-total"><span>A ENTREGAR</span><span>${money(entregar)}</span></div>
+      <div class="tk-sep"></div>
+      ${row('Firma', '________________')}
+      <div class="tk-pie">Corte de caja</div>
+    </div>`;
+  }
+  async function imprimirCorte() {
+    S._corteVentas = await calcVentasDia(hoy());
+    imprimir(corteTicketHTML());
+  }
+
   async function renderCorteHist() {
     const cortes = (await DB.all('cortes')).sort((a, b) => (a.fecha < b.fecha ? 1 : -1)).slice(0, 7);
     $('#corteHist').innerHTML = cortes.map((c) =>
@@ -1282,6 +1323,7 @@
     $('#corteApertura').oninput = recalcCorte;
     $('#corteOtros').oninput = recalcCorte;
     $('#btnGuardarCorte').onclick = guardarCorte;
+    $('#btnImprimirCorte').onclick = imprimirCorte;
     $('#btnRepGenerar').onclick = renderReportes;
     $$('.rep-quick .chip').forEach((c) => c.onclick = async () => {
       const h = new Date(); const fmt = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');

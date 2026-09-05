@@ -295,6 +295,8 @@ dialog::backdrop{background:rgba(15,23,42,.5)}
 .corte-resumen .row b{color:var(--ink)}
 .corte-entregar{display:flex;justify-content:space-between;align-items:center;background:var(--teal);color:#fff;border-radius:12px;padding:.8rem 1rem;font-weight:700;font-size:1.1rem}
 .corte-entregar b{font-size:1.4rem}
+.corte-botones{display:flex;gap:.6rem}
+.corte-botones .btn{flex:1}
 .corte-hist-t{font-weight:700;color:var(--slate);margin:.5rem 0 0}
 .corte-hist{display:flex;flex-direction:column;gap:.3rem}
 .ch-row{display:flex;justify-content:space-between;gap:1rem;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.5rem .7rem;font-size:.9rem}

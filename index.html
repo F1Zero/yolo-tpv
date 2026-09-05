@@ -64,7 +64,9 @@
             <select id="descPct" class="mini-select">
               <option value="0">0%</option><option value="5">5%</option>
               <option value="10">10%</option><option value="15">15%</option>
-              <option value="20">20%</option>
+              <option value="20">20%</option><option value="25">25%</option>
+              <option value="30">30%</option><option value="40">40%</option>
+              <option value="50">50%</option><option value="100">100%</option>
             </select>
           </span>
           <span id="tDescuento">-$0.00</span>
@@ -131,7 +133,10 @@
       <div class="corte-entregar">
         <span>Efectivo a entregar</span><b id="corteEntregar">$0.00</b>
       </div>
-      <button class="btn primary grande" id="btnGuardarCorte">Guardar corte del día</button>
+      <div class="corte-botones">
+        <button class="btn ghost" id="btnImprimirCorte">🖨️ Imprimir corte</button>
+        <button class="btn primary" id="btnGuardarCorte">Guardar corte del día</button>
+      </div>
       <p class="corte-hist-t">Cortes recientes</p>
       <div id="corteHist" class="corte-hist"></div>
     </div>
@@ -215,7 +220,10 @@
         <label>Descuento
           <select id="coDescPct" class="mini-select">
             <option value="0">0%</option><option value="5">5%</option>
-            <option value="10">10%</option><option value="15">15%</option><option value="20">20%</option>
+            <option value="10">10%</option><option value="15">15%</option>
+            <option value="20">20%</option><option value="25">25%</option>
+            <option value="30">30%</option><option value="40">40%</option>
+            <option value="50">50%</option><option value="100">100%</option>
           </select>
         </label>
       </div>
