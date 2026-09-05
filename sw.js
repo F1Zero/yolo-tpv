@@ -1,7 +1,7 @@
 /* ============================================================
    YOLO TPV — Service Worker (offline / PWA)
    ============================================================ */
-const VER = 'yolo-tpv-v1';
+const VER = 'yolo-tpv-v2';
 const CORE = 'core-' + VER;
 const IMGS = 'imgs-' + VER;
 
@@ -49,15 +49,12 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // App shell y demás: cache-first, con red de respaldo y actualización
+  // App shell y demás: NETWORK-FIRST (para recibir siempre la versión nueva),
+  // con respaldo a caché cuando no hay conexión.
   e.respondWith(
-    caches.match(req).then((hit) =>
-      hit || fetch(req).then((res) => {
-        if (res.ok && (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.png') || url.pathname.endsWith('.json') || url.pathname.endsWith('.html'))) {
-          const copy = res.clone(); caches.open(CORE).then((c) => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => caches.match('index.html'))
-    )
+    fetch(req).then((res) => {
+      if (res.ok) { const copy = res.clone(); caches.open(CORE).then((c) => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.match(req).then((hit) => hit || caches.match('index.html')))
   );
 });
