@@ -185,6 +185,7 @@
     await renderCategorias();
     await renderProductos();
     renderLineas();
+    $('.carrito').classList.remove('expandida'); // en móvil arranca colapsado
     mostrar('nota');
   }
 
@@ -298,6 +299,17 @@
       cont.appendChild(div);
     });
     pintarTotales(calcTotales(S.lineas, Number($('#descPct').value)));
+    actualizarHandle();
+  }
+
+  // resumen en la barra (handle) del carrito-hoja en móvil
+  function actualizarHandle() {
+    const uds = S.lineas.reduce((s, l) => s + l.uds, 0);
+    const art = $('#chArt'); if (!art) return;
+    art.textContent = uds + ' art.';
+    $('#chNfac').textContent = S.notaActual ? '#' + S.notaActual.nfactura : '—';
+    const t = calcTotales(S.lineas, Number($('#descPct').value || 0));
+    $('#chTotal').textContent = money(t.total);
   }
 
   // ---------- diálogo de modificadores ----------
@@ -1107,6 +1119,7 @@
     $('#buscar').oninput = renderProductos;
     $('#descPct').onchange = async () => { await guardarTotalesNota(); renderLineas(); };
     $('#btnImprimir').onclick = imprimirNotaActual;
+    $('#carritoHandle').onclick = () => $('.carrito').classList.toggle('expandida');
     // cobro: descuento, propina, montos de pago
     $('#coDescPct').onchange = recalcCobro;
     $('#pagEfectivo').oninput = recalcCobro;
