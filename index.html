@@ -91,6 +91,15 @@
     <div id="listaProductos" class="prod-lista"></div>
   </main>
 
+  <!-- ===== Vista: Historial de notas (pagadas / canceladas) ===== -->
+  <main id="viewHistorial" class="view" hidden>
+    <div class="view-head"><h1>Notas pagadas / historial</h1></div>
+    <div class="buscador prod-buscador">
+      <input type="search" id="buscarHist" placeholder="Buscar por # nota, mesa o mesero…" autocomplete="off" />
+    </div>
+    <div id="listaHistorial" class="hist-lista"></div>
+  </main>
+
   <!-- ===== Vista: Consultar precios (solo lectura) ===== -->
   <main id="viewPrecios" class="view" hidden>
     <div class="view-head"><h1>Consultar precios</h1></div>
@@ -165,7 +174,7 @@
       </div>
       <label class="check"><input id="epActivo" type="checkbox" checked /> Activo (visible en el TPV)</label>
       <div class="dlg-acciones">
-        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn ghost" value="cancel" type="submit" formnovalidate>Cancelar</button>
         <button class="btn primary" id="btnGuardarProd" value="ok" type="submit">Guardar</button>
       </div>
     </form>
@@ -183,7 +192,7 @@
         <datalist id="meseros"></datalist>
       </label>
       <div class="dlg-acciones">
-        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn ghost" value="cancel" type="submit" formnovalidate>Cancelar</button>
         <button class="btn primary" id="dlgNotaOk" value="ok" type="submit">Guardar</button>
       </div>
     </form>
@@ -194,16 +203,10 @@
     <form method="dialog" class="dlg-form cobro">
       <h2>Cobrar nota <span id="coNfactura"></span></h2>
 
-      <div class="cobro-grid">
+      <div class="cobro-grid uno">
         <label>Descuento
           <select id="coDescPct" class="mini-select">
             <option value="0">0%</option><option value="5">5%</option>
-            <option value="10">10%</option><option value="15">15%</option><option value="20">20%</option>
-          </select>
-        </label>
-        <label>Propina
-          <select id="inpPropina" class="mini-select">
-            <option value="0">Sin propina</option>
             <option value="10">10%</option><option value="15">15%</option><option value="20">20%</option>
           </select>
         </label>
@@ -233,8 +236,13 @@
         <div class="row cambio"><span>Cambio</span><b id="coCambio">$0.00</b></div>
       </div>
 
+      <div class="propina-sug">
+        <div class="propina-sug-t">Sugerencia de propina (no incluida)</div>
+        <div id="propinaSug" class="propina-sug-vals"></div>
+      </div>
+
       <div class="dlg-acciones">
-        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn ghost" value="cancel" type="submit" formnovalidate>Cancelar</button>
         <button class="btn primary" id="btnConfirmarCobro" value="ok" type="submit">Confirmar cobro</button>
       </div>
     </form>
@@ -244,6 +252,7 @@
   <div id="drawer" class="drawer" hidden>
     <div class="drawer-panel">
       <button class="drawer-item" data-nav="notas">🧾 Notas abiertas</button>
+      <button class="drawer-item" data-nav="historial">🗂️ Notas pagadas / historial</button>
       <button class="drawer-item" data-nav="precios">🔎 Consultar precios</button>
       <button class="drawer-item" data-nav="corte">💰 Corte de caja</button>
       <button class="drawer-item" data-nav="reportes">📊 Reportes</button>
@@ -325,7 +334,7 @@
       </label>
       <div class="mod-total">Subtotal del platillo: <b id="modSub">$0.00</b></div>
       <div class="dlg-acciones">
-        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn ghost" value="cancel" type="submit" formnovalidate>Cancelar</button>
         <button class="btn primary" id="modOk" value="ok" type="submit">Agregar</button>
       </div>
     </form>
@@ -342,7 +351,7 @@
         <span>Queda: <b id="sepTotalQueda">$0.00</b></span>
       </div>
       <div class="dlg-acciones">
-        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn ghost" value="cancel" type="submit" formnovalidate>Cancelar</button>
         <button class="btn primary" id="sepOk" value="ok" type="submit">Separar</button>
       </div>
     </form>

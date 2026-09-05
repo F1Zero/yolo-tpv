@@ -110,6 +110,7 @@
     $('#viewNotas').hidden = vista !== 'notas';
     $('#viewNota').hidden = vista !== 'nota';
     $('#viewProductos').hidden = vista !== 'productos';
+    $('#viewHistorial').hidden = vista !== 'historial';
     $('#viewPrecios').hidden = vista !== 'precios';
     $('#viewCorte').hidden = vista !== 'corte';
     $('#viewReportes').hidden = vista !== 'reportes';
@@ -380,7 +381,6 @@
     if (!S.lineas.length) { toast('La nota está vacía'); return; }
     $('#coNfactura').textContent = '#' + S.notaActual.nfactura;
     $('#coDescPct').value = String(S.notaActual.desc_pct || 0);
-    $('#inpPropina').value = '0';
     $('#pagEfectivo').value = '';
     $('#pagTarjeta').value = '';
     $('#pagTransfer').value = '';
@@ -391,11 +391,10 @@
     dlg.onclose = async () => { if (dlg.returnValue === 'ok') await confirmarCobro(); };
   }
 
-  // total a cobrar = total con descuento + propina
+  // total a cobrar = total con descuento (la propina NO se cobra, solo se sugiere)
   function _dueCobro() {
     const t = calcTotales(S.lineas, Number($('#coDescPct').value));
-    const propina = round2(t.total * (Number($('#inpPropina').value) / 100));
-    return { t, propina, due: round2(t.total + propina) };
+    return { t, due: t.total };
   }
 
   function recalcCobro() {
@@ -412,6 +411,9 @@
     $('#coFalta').textContent = money(falta);
     $('#coCambio').textContent = money(cambio);
     $('#rowFalta').style.color = falta > 0 ? 'var(--danger)' : 'var(--muted)';
+    // sugerencias de propina (solo informativas)
+    $('#propinaSug').innerHTML = [5, 10, 15, 20].map((pct) =>
+      `<span class="psug"><b>${pct}%</b> ${money(round2(due * pct / 100))}</span>`).join('');
     S._due = due;
   }
 
@@ -426,9 +428,8 @@
   async function confirmarCobro() {
     const descPct = Number($('#coDescPct').value);
     const t = calcTotales(S.lineas, descPct);
-    const propPct = Number($('#inpPropina').value);
-    const propina = round2(t.total * (propPct / 100));
-    const due = round2(t.total + propina);
+    const propPct = 0, propina = 0;   // la propina no se cobra
+    const due = t.total;
     let e = parseFloat($('#pagEfectivo').value) || 0;
     const ta = parseFloat($('#pagTarjeta').value) || 0;
     const tr = parseFloat($('#pagTransfer').value) || 0;
@@ -773,6 +774,73 @@
   }
 
   // ============================================================
+  //  HISTORIAL (notas pagadas / canceladas)
+  // ============================================================
+  async function renderHistorial() {
+    const q = ($('#buscarHist').value || '').toLowerCase().trim();
+    let notas = (await DB.all('notas')).filter((n) => n.estado === 'Cobrada' || n.estado === 'Cancelada');
+    notas.sort((a, b) => b.nfactura - a.nfactura);
+    if (q) notas = notas.filter((n) => ('' + n.nfactura).includes(q) || (n.mesa || '').toLowerCase().includes(q) || (n.atendio || '').toLowerCase().includes(q));
+    notas = notas.slice(0, 100);
+    const cont = $('#listaHistorial');
+    cont.innerHTML = '';
+    for (const n of notas) {
+      const est = n.estado === 'Cancelada' ? 'cancel' : 'cobr';
+      const row = document.createElement('div');
+      row.className = 'hist-row';
+      row.innerHTML = `
+        <div class="h-main">
+          <div class="h-top"><b>#${n.nfactura}</b> · Mesa ${escapeHtml(n.mesa)} <span class="h-est ${est}">${n.estado}</span></div>
+          <div class="h-sub">${n.fecha} · ${escapeHtml(n.atendio || '')}${n.metodo ? ' · ' + escapeHtml(n.metodo) : ''}</div>
+        </div>
+        <div class="h-tot">${money(n.total)}</div>
+        <div class="h-acc">
+          <button class="btn ghost mini" data-a="ticket" title="Reimprimir">🖨️</button>
+          <button class="btn ghost mini" data-a="reabrir">Reabrir</button>
+          <button class="btn ghost mini hdel" data-a="borrar" title="Eliminar">🗑</button>
+        </div>`;
+      row.querySelector('[data-a=ticket]').onclick = () => reimprimirNota(n.nfactura);
+      row.querySelector('[data-a=reabrir]').onclick = () => reabrirNota(n.nfactura);
+      row.querySelector('[data-a=borrar]').onclick = () => eliminarNotaHist(n.nfactura);
+      cont.appendChild(row);
+    }
+    if (!notas.length) cont.innerHTML = '<p class="vacio">Sin notas en el historial.</p>';
+  }
+
+  async function reabrirNota(nfactura) {
+    if (!confirm('¿Reabrir la nota #' + nfactura + '?\nVolverá a "Notas abiertas" para editarla o cobrarla de nuevo. Se quitará el pago registrado.')) return;
+    const nota = await DB.get('notas', nfactura);
+    if (!nota) return;
+    const lineas = await DB.byIndex('lineas', 'nfactura', nfactura);
+    const pago = await DB.get('pagos', nfactura);
+    if (pago) { await DB.del('pagos', nfactura); sync('pagos', 'delete', { nfactura }); }
+    for (const l of lineas) { l.estado = 'Ordenado'; l.updated = Date.now(); await DB.put('lineas', l); sync('ventas', 'upsert', l); }
+    nota.estado = 'Abierta'; nota.metodo = ''; nota.updated = Date.now();
+    await DB.put('notas', nota); sync('notas', 'upsert', nota);
+    toast('Nota #' + nfactura + ' reabierta');
+    await cargarNota(nfactura);
+  }
+
+  async function eliminarNotaHist(nfactura) {
+    if (!confirm('¿ELIMINAR la nota #' + nfactura + ' de forma permanente?\nSe borrará del sistema y de la hoja al sincronizar. No se puede deshacer.')) return;
+    const lineas = await DB.byIndex('lineas', 'nfactura', nfactura);
+    for (const l of lineas) { await DB.del('lineas', l.id); sync('ventas', 'delete', l); }
+    const pago = await DB.get('pagos', nfactura);
+    if (pago) { await DB.del('pagos', nfactura); sync('pagos', 'delete', { nfactura }); }
+    await DB.del('notas', nfactura); sync('notas', 'delete', { nfactura });
+    toast('Nota #' + nfactura + ' eliminada');
+    await renderHistorial();
+  }
+
+  async function reimprimirNota(nfactura) {
+    const nota = await DB.get('notas', nfactura);
+    const lineas = (await DB.byIndex('lineas', 'nfactura', nfactura)).sort((a, b) => a.fecha - b.fecha);
+    const pago = await DB.get('pagos', nfactura);
+    if (!nota) return;
+    imprimir(ticketHTML(nota, lineas, pago || null, null));
+  }
+
+  // ============================================================
   //  CORTE DE CAJA
   // ============================================================
   async function calcVentasDia(fechaStr) {
@@ -1041,7 +1109,6 @@
     $('#btnImprimir').onclick = imprimirNotaActual;
     // cobro: descuento, propina, montos de pago
     $('#coDescPct').onchange = recalcCobro;
-    $('#inpPropina').onchange = recalcCobro;
     $('#pagEfectivo').oninput = recalcCobro;
     $('#pagTarjeta').oninput = recalcCobro;
     $('#pagTransfer').oninput = recalcCobro;
@@ -1061,6 +1128,7 @@
       const nav = b.dataset.nav;
       cerrarDrawer();
       if (nav === 'notas') { await renderNotas(); mostrar('notas'); }
+      else if (nav === 'historial') { await renderHistorial(); mostrar('historial'); }
       else if (nav === 'productos') { await renderProductosAdmin(); mostrar('productos'); }
       else if (nav === 'precios') { await renderPrecios(); mostrar('precios'); }
       else if (nav === 'corte') { await renderCorte(); mostrar('corte'); }
@@ -1072,6 +1140,7 @@
 
     // ----- precios / corte / reportes / comanda / separar / about -----
     $('#buscarPrecio').oninput = renderPrecios;
+    $('#buscarHist').oninput = renderHistorial;
     $('#btnComanda').onclick = imprimirComandaActual;
     $('#btnSeparar').onclick = abrirSeparar;
     $('#corteApertura').oninput = recalcCorte;
