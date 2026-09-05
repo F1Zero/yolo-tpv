@@ -1018,8 +1018,8 @@
     const otros = parseFloat($('#corteOtros').value) || 0;
     const corte = {
       fecha: f, apertura: ap, total_ventas: v.total, v_efectivo: v.ef, v_tarjeta: v.tar, v_transfer: v.tr,
-      descuentos: v.desc, entregar: round2(ap + v.ef - otros), otros, motivo: $('#corteMotivo').value.trim(),
-      canceladas: v.canceladas, updated: Date.now(),
+      descuentos: v.desc, propinas: v.prop, notas: v.nNotas, entregar: round2(ap + v.ef - otros),
+      otros, motivo: $('#corteMotivo').value.trim(), canceladas: v.canceladas, updated: Date.now(),
     };
     await DB.put('cortes', corte);
     sync('cortes', 'upsert', corte);
@@ -1027,52 +1027,70 @@
     toast('Corte del día guardado');
     await renderCorteHist();
   }
-  // ticket imprimible del corte de caja (mismo formato térmico con logo)
-  function corteTicketHTML() {
-    const f = hoy();
-    const v = S._corteVentas || { ef: 0, tar: 0, tr: 0, total: 0, desc: 0, prop: 0, nNotas: 0, canceladas: 0 };
-    const ap = parseFloat($('#corteApertura').value) || 0;
-    const otros = parseFloat($('#corteOtros').value) || 0;
-    const motivo = $('#corteMotivo').value.trim();
-    const entregar = round2(ap + v.ef - otros);
+  // ticket imprimible del corte de caja (recibe un objeto corte -en vivo o guardado-)
+  function corteTicketHTML(c) {
     const row = (k, val) => `<div class="tk-row"><span>${escapeHtml(k)}</span><span>${val}</span></div>`;
+    const hora = c.updated ? (fechaTicket(c.updated).split(' ')[1] || '') : (fechaTicket(Date.now()).split(' ')[1] || '');
     return `<div class="tk">
       <img class="tk-logo" src="${NEGOCIO.logo}" onerror="this.style.display='none'">
       <div class="tk-nom">${escapeHtml(NEGOCIO.nombre)}</div>
       <div class="tk-fiscal">RFC: ${NEGOCIO.rfc}<br>Tel. ${NEGOCIO.telefono}</div>
       <div class="tk-sep"></div>
       <div class="tk-titulo">CORTE DE CAJA</div>
-      ${row('Fecha', f)}
-      ${row('Hora', (fechaTicket(Date.now()).split(' ')[1] || ''))}
+      ${row('Fecha', c.fecha)}
+      ${row('Hora', hora)}
       <div class="tk-sep"></div>
-      ${row('Apertura de caja', money(ap))}
-      ${row('Notas cobradas', v.nNotas)}
-      ${row('Total de ventas', money(v.total))}
-      ${row('Efectivo', money(v.ef))}
-      ${row('Tarjeta', money(v.tar))}
-      ${row('Transferencia', money(v.tr))}
-      ${row('Descuentos', money(v.desc))}
-      ${row('Propinas', money(v.prop))}
-      ${row('Notas canceladas', v.canceladas)}
-      ${otros > 0 ? row('Disposición efectivo', money(otros)) : ''}
-      ${motivo ? row('Motivo', motivo) : ''}
+      ${row('Apertura de caja', money(c.apertura || 0))}
+      ${row('Notas cobradas', c.notas != null ? c.notas : '')}
+      ${row('Total de ventas', money(c.total_ventas || 0))}
+      ${row('Efectivo', money(c.v_efectivo || 0))}
+      ${row('Tarjeta', money(c.v_tarjeta || 0))}
+      ${row('Transferencia', money(c.v_transfer || 0))}
+      ${row('Descuentos', money(c.descuentos || 0))}
+      ${row('Propinas', money(c.propinas || 0))}
+      ${row('Notas canceladas', c.canceladas != null ? c.canceladas : '')}
+      ${c.otros > 0 ? row('Disposición efectivo', money(c.otros)) : ''}
+      ${c.motivo ? row('Motivo', c.motivo) : ''}
       <div class="tk-sep"></div>
-      <div class="tk-row tk-total"><span>A ENTREGAR</span><span>${money(entregar)}</span></div>
+      <div class="tk-row tk-total"><span>A ENTREGAR</span><span>${money(c.entregar || 0)}</span></div>
       <div class="tk-sep"></div>
       ${row('Firma', '________________')}
       <div class="tk-pie">Corte de caja</div>
     </div>`;
   }
+  // arma el objeto corte con los datos actuales del formulario
+  function corteActual() {
+    const v = S._corteVentas || { ef: 0, tar: 0, tr: 0, total: 0, desc: 0, prop: 0, nNotas: 0, canceladas: 0 };
+    const ap = parseFloat($('#corteApertura').value) || 0;
+    const otros = parseFloat($('#corteOtros').value) || 0;
+    return {
+      fecha: hoy(), apertura: ap, total_ventas: v.total, v_efectivo: v.ef, v_tarjeta: v.tar, v_transfer: v.tr,
+      descuentos: v.desc, propinas: v.prop, notas: v.nNotas, canceladas: v.canceladas,
+      otros, motivo: $('#corteMotivo').value.trim(), entregar: round2(ap + v.ef - otros), updated: Date.now(),
+    };
+  }
   async function imprimirCorte() {
     S._corteVentas = await calcVentasDia(hoy());
-    imprimir(corteTicketHTML());
+    imprimir(corteTicketHTML(corteActual()));
+  }
+  async function imprimirCorteGuardado(fecha) {
+    const c = await DB.get('cortes', fecha);
+    if (c) imprimir(corteTicketHTML(c));
   }
 
   async function renderCorteHist() {
-    const cortes = (await DB.all('cortes')).sort((a, b) => (a.fecha < b.fecha ? 1 : -1)).slice(0, 7);
-    $('#corteHist').innerHTML = cortes.map((c) =>
-      `<div class="ch-row"><span>${c.fecha}</span><span>${money(c.total_ventas)}</span><b>${money(c.entregar)}</b></div>`).join('')
-      || '<p class="vacio small">Aún no hay cortes.</p>';
+    const cortes = (await DB.all('cortes')).sort((a, b) => (a.fecha < b.fecha ? 1 : -1)).slice(0, 10);
+    const cont = $('#corteHist');
+    cont.innerHTML = '';
+    if (!cortes.length) { cont.innerHTML = '<p class="vacio small">Aún no hay cortes.</p>'; return; }
+    for (const c of cortes) {
+      const row = document.createElement('div');
+      row.className = 'ch-row';
+      row.innerHTML = `<span class="ch-f">${c.fecha}</span><span>${money(c.total_ventas)}</span><b>${money(c.entregar)}</b>
+        <button class="btn ghost mini" title="Reimprimir">🖨️</button>`;
+      row.querySelector('button').onclick = () => imprimirCorteGuardado(c.fecha);
+      cont.appendChild(row);
+    }
   }
 
   // ============================================================
