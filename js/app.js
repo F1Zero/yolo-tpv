@@ -154,6 +154,7 @@
   // ============================================================
   async function nuevaNota() {
     $('#dlgNotaTitulo').textContent = 'Nueva nota';
+    $('#inpFolio').value = await siguienteFolioSugerido();
     $('#inpMesa').value = '';
     $('#inpAtendio').value = await DB.getMeta('ultimo_mesero', '');
     await llenarMeseros();
@@ -162,19 +163,28 @@
     dlg.showModal();
     dlg.onclose = async () => {
       if (dlg.returnValue !== 'ok') return;
+      const nfactura = parseInt($('#inpFolio').value, 10);
+      if (!nfactura || nfactura < 1) { toast('N° de nota inválido'); return; }
+      if (await DB.get('notas', nfactura)) { toast('Ya existe la nota #' + nfactura); return; }
       const mesa = $('#inpMesa').value.trim() || 'S/M';
       const atendio = $('#inpAtendio').value.trim();
-      const nfactura = await nuevoFolio();
       const nota = {
         nfactura, fecha: hoy(), mesa, atendio,
         estado: 'Abierta', subtotal: 0, iva: 0, desc_pct: 0, descuento: 0, total: 0,
         updated: Date.now(),
       };
       await DB.put('notas', nota);
+      await DB.setMeta('folio', nfactura);
       sync('notas', 'upsert', nota);
       if (atendio) await DB.setMeta('ultimo_mesero', atendio);
       await cargarNota(nfactura);
     };
+  }
+
+  // sugiere el siguiente folio sin consumirlo (máximo global + 1)
+  async function siguienteFolioSugerido() {
+    const notas = await DB.all('notas');
+    return notas.reduce((m, n) => Math.max(m, Number(n.nfactura) || 0), FOLIO_INICIAL - 1) + 1;
   }
 
   async function abrirNota(nfactura) { await cargarNota(nfactura); }
@@ -654,6 +664,7 @@
   // ---------- editar datos de nota ----------
   async function editarNota() {
     $('#dlgNotaTitulo').textContent = 'Editar nota #' + S.notaActual.nfactura;
+    $('#inpFolio').value = S.notaActual.nfactura;
     $('#inpMesa').value = S.notaActual.mesa;
     $('#inpAtendio').value = S.notaActual.atendio || '';
     await llenarMeseros();
@@ -662,14 +673,42 @@
     dlg.showModal();
     dlg.onclose = async () => {
       if (dlg.returnValue !== 'ok') return;
+      const nuevoNf = parseInt($('#inpFolio').value, 10);
+      const viejoNf = S.notaActual.nfactura;
+      if (!nuevoNf || nuevoNf < 1) { toast('N° de nota inválido'); return; }
+      if (nuevoNf !== viejoNf) {
+        if (await DB.get('notas', nuevoNf)) { toast('Ya existe la nota #' + nuevoNf); return; }
+        await migrarFolio(viejoNf, nuevoNf);
+      }
       S.notaActual.mesa = $('#inpMesa').value.trim() || 'S/M';
       S.notaActual.atendio = $('#inpAtendio').value.trim();
       S.notaActual.updated = Date.now();
       await DB.put('notas', S.notaActual);
       sync('notas', 'upsert', S.notaActual);
+      $('#cNfactura').textContent = '#' + S.notaActual.nfactura;
       $('#cMesa').textContent = S.notaActual.mesa;
       $('#cAtendio').textContent = S.notaActual.atendio || 'S/N';
     };
+  }
+
+  // Cambia el número de nota (folio): migra líneas y pago, borra el viejo. Sincroniza.
+  async function migrarFolio(viejoNf, nuevoNf) {
+    const nota = await DB.get('notas', viejoNf);
+    const lineas = await DB.byIndex('lineas', 'nfactura', viejoNf);
+    const pago = await DB.get('pagos', viejoNf);
+    const nueva = { ...nota, nfactura: nuevoNf, updated: Date.now() };
+    await DB.put('notas', nueva); sync('notas', 'upsert', nueva);
+    for (const l of lineas) { l.nfactura = nuevoNf; l.updated = Date.now(); await DB.put('lineas', l); sync('ventas', 'upsert', l); }
+    if (pago) {
+      const np = { ...pago, nfactura: nuevoNf };
+      await DB.put('pagos', np); sync('pagos', 'upsert', np);
+      await DB.del('pagos', viejoNf); sync('pagos', 'delete', { nfactura: viejoNf });
+    }
+    await DB.del('notas', viejoNf); sync('notas', 'delete', { nfactura: viejoNf });
+    if (nuevoNf > (await DB.getMeta('folio', 0))) await DB.setMeta('folio', nuevoNf);
+    // recargar estado en memoria a la nueva nota + sus líneas
+    S.notaActual = await DB.get('notas', nuevoNf);
+    S.lineas = (await DB.byIndex('lineas', 'nfactura', nuevoNf)).sort((a, b) => a.fecha - b.fecha);
   }
 
   async function llenarMeseros() {
