@@ -836,35 +836,101 @@
   // ============================================================
   //  HISTORIAL (notas pagadas / canceladas)
   // ============================================================
+  const _histExp = new Set();   // grupos (mes/día) expandidos
+  let _histInit = false;
+  const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
   async function renderHistorial() {
     const q = ($('#buscarHist').value || '').toLowerCase().trim();
     let notas = (await DB.all('notas')).filter((n) => n.estado === 'Cobrada' || n.estado === 'Cancelada');
-    notas.sort((a, b) => b.nfactura - a.nfactura);
     if (q) notas = notas.filter((n) => ('' + n.nfactura).includes(q) || (n.mesa || '').toLowerCase().includes(q) || (n.atendio || '').toLowerCase().includes(q));
-    notas = notas.slice(0, 100);
+    // agrupar por mes -> día
+    const meses = new Map(); // 'YYYY-MM' -> {label, total, count, dias: Map}
+    for (const n of notas) {
+      const f = (n.fecha || '').slice(0, 10);
+      const ym = f.slice(0, 7) || 'sin';
+      const d = new Date(f + 'T00:00:00');
+      const okDate = !isNaN(d);
+      const mLabel = okDate ? (MESES[d.getMonth()] + ' ' + d.getFullYear()) : 'Sin fecha';
+      const dLabel = okDate ? (DIAS[d.getDay()] + ' ' + d.getDate()) : 'Sin fecha';
+      if (!meses.has(ym)) meses.set(ym, { label: mLabel, total: 0, count: 0, dias: new Map() });
+      const M = meses.get(ym);
+      M.total += n.total || 0; M.count++;
+      if (!M.dias.has(f)) M.dias.set(f, { label: dLabel, total: 0, count: 0, notas: [] });
+      const D = M.dias.get(f);
+      D.total += n.total || 0; D.count++; D.notas.push(n);
+    }
+    // orden descendente (más reciente primero)
+    const ymKeys = [...meses.keys()].sort().reverse();
+    // expandir por defecto el mes y día más recientes (solo la primera vez)
+    if (!_histInit && ymKeys.length) {
+      _histExp.add('m:' + ymKeys[0]);
+      const dKeys0 = [...meses.get(ymKeys[0]).dias.keys()].sort().reverse();
+      if (dKeys0[0]) _histExp.add('d:' + dKeys0[0]);
+      _histInit = true;
+    }
+    if (q) ymKeys.forEach((ym) => { _histExp.add('m:' + ym); [...meses.get(ym).dias.keys()].forEach((dk) => _histExp.add('d:' + dk)); });
+
     const cont = $('#listaHistorial');
     cont.innerHTML = '';
-    for (const n of notas) {
-      const est = n.estado === 'Cancelada' ? 'cancel' : 'cobr';
-      const row = document.createElement('div');
-      row.className = 'hist-row';
-      row.innerHTML = `
-        <div class="h-main">
-          <div class="h-top"><b>#${n.nfactura}</b> · Mesa ${escapeHtml(n.mesa)} <span class="h-est ${est}">${n.estado}</span></div>
-          <div class="h-sub">${n.fecha} · ${escapeHtml(n.atendio || '')}${n.metodo ? ' · ' + escapeHtml(n.metodo) : ''}</div>
-        </div>
-        <div class="h-tot">${money(n.total)}</div>
-        <div class="h-acc">
-          <button class="btn ghost mini" data-a="ticket" title="Reimprimir">🖨️</button>
-          <button class="btn ghost mini" data-a="reabrir">Reabrir</button>
-          <button class="btn ghost mini hdel" data-a="borrar" title="Eliminar">🗑</button>
-        </div>`;
-      row.querySelector('[data-a=ticket]').onclick = () => reimprimirNota(n.nfactura);
-      row.querySelector('[data-a=reabrir]').onclick = () => reabrirNota(n.nfactura);
-      row.querySelector('[data-a=borrar]').onclick = () => eliminarNotaHist(n.nfactura);
-      cont.appendChild(row);
+    if (!notas.length) { cont.innerHTML = '<p class="vacio">Sin notas en el historial.</p>'; return; }
+
+    for (const ym of ymKeys) {
+      const M = meses.get(ym);
+      const mOpen = _histExp.has('m:' + ym);
+      const mBox = document.createElement('div'); mBox.className = 'hg-mes';
+      const mh = document.createElement('button');
+      mh.className = 'hg-mh' + (mOpen ? ' open' : '');
+      mh.innerHTML = `<span class="hg-chev">▸</span><span class="hg-lbl">${M.label}</span><span class="hg-meta">${M.count} · ${money(M.total)}</span>`;
+      mh.onclick = () => { toggleHist('m:' + ym); };
+      mBox.appendChild(mh);
+      if (mOpen) {
+        const dKeys = [...M.dias.keys()].sort().reverse();
+        for (const dk of dKeys) {
+          const D = M.dias.get(dk);
+          const dOpen = _histExp.has('d:' + dk);
+          const dBox = document.createElement('div'); dBox.className = 'hg-dia';
+          const dh = document.createElement('button');
+          dh.className = 'hg-dh' + (dOpen ? ' open' : '');
+          dh.innerHTML = `<span class="hg-chev">▸</span><span class="hg-lbl">${D.label}</span><span class="hg-meta">${D.count} · ${money(D.total)}</span>`;
+          dh.onclick = () => { toggleHist('d:' + dk); };
+          dBox.appendChild(dh);
+          if (dOpen) {
+            D.notas.sort((a, b) => b.nfactura - a.nfactura);
+            for (const n of D.notas) dBox.appendChild(histRow(n));
+          }
+          mBox.appendChild(dBox);
+        }
+      }
+      cont.appendChild(mBox);
     }
-    if (!notas.length) cont.innerHTML = '<p class="vacio">Sin notas en el historial.</p>';
+  }
+
+  function toggleHist(key) {
+    if (_histExp.has(key)) _histExp.delete(key); else _histExp.add(key);
+    renderHistorial();
+  }
+
+  function histRow(n) {
+    const est = n.estado === 'Cancelada' ? 'cancel' : 'cobr';
+    const row = document.createElement('div');
+    row.className = 'hist-row';
+    row.innerHTML = `
+      <div class="h-main">
+        <div class="h-top"><b>#${n.nfactura}</b> · Mesa ${escapeHtml(n.mesa)} <span class="h-est ${est}">${n.estado}</span></div>
+        <div class="h-sub">${escapeHtml(n.atendio || '')}${n.metodo ? ' · ' + escapeHtml(n.metodo) : ''}</div>
+      </div>
+      <div class="h-tot">${money(n.total)}</div>
+      <div class="h-acc">
+        <button class="btn ghost mini" data-a="ticket" title="Reimprimir">🖨️</button>
+        <button class="btn ghost mini" data-a="reabrir">Reabrir</button>
+        <button class="btn ghost mini hdel" data-a="borrar" title="Eliminar">🗑</button>
+      </div>`;
+    row.querySelector('[data-a=ticket]').onclick = () => reimprimirNota(n.nfactura);
+    row.querySelector('[data-a=reabrir]').onclick = () => reabrirNota(n.nfactura);
+    row.querySelector('[data-a=borrar]').onclick = () => eliminarNotaHist(n.nfactura);
+    return row;
   }
 
   async function reabrirNota(nfactura) {
