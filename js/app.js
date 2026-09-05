@@ -429,11 +429,14 @@
     S._due = due;
   }
 
-  function pagoExactoEfectivo() {
+  // Toca un método -> llena ese campo con lo que falta para cubrir el total
+  function llenarMetodo(targetId) {
     const { due } = _dueCobro();
-    const ta = parseFloat($('#pagTarjeta').value) || 0;
-    const tr = parseFloat($('#pagTransfer').value) || 0;
-    $('#pagEfectivo').value = String(round2(Math.max(0, due - ta - tr)));
+    const ids = ['pagEfectivo', 'pagTarjeta', 'pagTransfer'];
+    const otros = ids.filter((id) => id !== targetId)
+      .reduce((s, id) => s + (parseFloat($('#' + id).value) || 0), 0);
+    const restante = round2(Math.max(0, due - otros));
+    $('#' + targetId).value = restante ? String(restante) : '';
     recalcCobro();
   }
 
@@ -570,20 +573,20 @@
   function buildPdfHtml(nota, lineas, pago) {
     const inner = ticketHTML(nota, lineas, pago, null, window.LOGO_DATAURI || NEGOCIO.logo);
     const css = `
-      *{box-sizing:border-box} body{margin:0;font-family:'Courier New',monospace;color:#000}
-      .tk{width:76mm;margin:0 auto;font-size:12px;line-height:1.35}
-      .tk-logo{display:block;margin:0 auto 4px;max-width:34mm;max-height:34mm}
-      .tk-nom{text-align:center;font-weight:700;font-size:14px}
-      .tk-fiscal{text-align:center;font-size:10px;margin-top:2px}
-      .tk-titulo{text-align:center;font-weight:700;margin:2px 0}
-      .tk-sep{border-top:1px dashed #000;margin:5px 0}
+      *{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#000;font-weight:700}
+      .tk{width:76mm;margin:0 auto;font-size:15px;line-height:1.45}
+      .tk-logo{display:block;margin:0 auto 6px;max-width:34mm;max-height:34mm;filter:grayscale(1) contrast(1.35)}
+      .tk-nom{text-align:center;font-weight:800;font-size:19px}
+      .tk-fiscal{text-align:center;font-size:12px;font-weight:600;margin-top:3px}
+      .tk-titulo{text-align:center;font-weight:800;font-size:16px;margin:3px 0}
+      .tk-sep{border-top:2px solid #000;margin:6px 0}
       .tk-row{display:flex;justify-content:space-between;gap:8px}
-      .tk-total{font-weight:700;font-size:14px;border-top:1px solid #000;margin-top:3px;padding-top:3px}
+      .tk-total{font-weight:800;font-size:19px;border-top:2px solid #000;margin-top:4px;padding-top:4px}
       .tk-tabla{width:100%;border-collapse:collapse}
-      .tk-tabla th{text-align:left;font-size:10px;border-bottom:1px solid #000}
-      .tk-tabla td{vertical-align:top;padding:1px 0}
-      .tk-tabla .tu{text-align:center;width:26px}.tk-tabla .tp{text-align:right;white-space:nowrap;width:64px}
-      .tk .tmod{font-size:10px;font-style:italic}.tk-pie{text-align:center;margin-top:8px;font-weight:700}`;
+      .tk-tabla th{text-align:left;font-size:12px;font-weight:800;border-bottom:2px solid #000;padding-bottom:2px}
+      .tk-tabla td{vertical-align:top;padding:2px 0;font-weight:700}
+      .tk-tabla .tu{text-align:center;width:30px}.tk-tabla .tp{text-align:right;white-space:nowrap;width:70px}
+      .tk .tmod{font-size:13px;font-weight:600}.tk-pie{text-align:center;margin-top:10px;font-weight:800;font-size:15px}`;
     return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${inner}</body></html>`;
   }
 
@@ -1125,7 +1128,7 @@
     $('#pagEfectivo').oninput = recalcCobro;
     $('#pagTarjeta').oninput = recalcCobro;
     $('#pagTransfer').oninput = recalcCobro;
-    $('#btnPagoExacto').onclick = pagoExactoEfectivo;
+    $$('.psplit-lbl').forEach((b) => b.onclick = () => llenarMetodo(b.dataset.t));
     // no permitir confirmar si lo pagado no cubre el total
     $('#btnConfirmarCobro').addEventListener('click', (e) => {
       const { due } = _dueCobro();

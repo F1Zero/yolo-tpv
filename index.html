@@ -220,19 +220,19 @@
       <div class="cobro-total">Total a pagar <b id="coTotal">$0.00</b></div>
 
       <div class="pagos-split">
+        <p class="psplit-hint">Toca el método para llenar el total, o escribe montos para dividir.</p>
         <div class="psplit-row">
-          <span class="psplit-lbl">💵 Efectivo</span>
+          <button type="button" class="psplit-lbl" data-t="pagEfectivo">💵 Efectivo</button>
           <input id="pagEfectivo" class="psplit-inp" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
         </div>
         <div class="psplit-row">
-          <span class="psplit-lbl">💳 Tarjeta</span>
+          <button type="button" class="psplit-lbl" data-t="pagTarjeta">💳 Tarjeta</button>
           <input id="pagTarjeta" class="psplit-inp" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
         </div>
         <div class="psplit-row">
-          <span class="psplit-lbl">📲 Transfer.</span>
+          <button type="button" class="psplit-lbl" data-t="pagTransfer">📲 Transfer.</button>
           <input id="pagTransfer" class="psplit-inp" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
         </div>
-        <button type="button" class="link-btn" id="btnPagoExacto">Pago exacto en efectivo</button>
       </div>
 
       <div class="cobro-resumen">

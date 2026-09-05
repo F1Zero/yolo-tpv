@@ -176,8 +176,10 @@ dialog::backdrop{background:rgba(15,23,42,.5)}
 .psug{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.3rem .55rem;font-size:.82rem;color:var(--ink)}
 .psug b{color:var(--teal)}
 .pagos-split{display:flex;flex-direction:column;gap:.5rem}
+.psplit-hint{font-size:.75rem;color:var(--muted);margin:0}
 .psplit-row{display:flex;align-items:center;gap:.6rem}
-.psplit-lbl{flex:0 0 110px;font-weight:600;color:var(--ink)}
+.psplit-lbl{flex:0 0 128px;font-weight:700;color:#fff;background:var(--teal);border:0;border-radius:10px;padding:.65rem .4rem;font-size:.92rem;cursor:pointer;text-align:center}
+.psplit-lbl:active{background:var(--teal-d)}
 .psplit-inp{flex:1;padding:.6rem .7rem;border:1.5px solid var(--line);border-radius:10px;font-size:1.1rem;text-align:right}
 .psplit-inp:focus{outline:none;border-color:var(--teal-l)}
 #btnPagoExacto{align-self:flex-end}
@@ -197,29 +199,30 @@ dialog::backdrop{background:rgba(15,23,42,.5)}
 
 /* ---------- ticket impreso (80mm) ---------- */
 #ticketPrint{display:none}
-.tk{width:76mm;margin:0 auto;color:#000;font-family:"Courier New",monospace;font-size:12px;line-height:1.35}
-.tk-logo{display:block;margin:0 auto 4px;max-width:38mm;max-height:38mm}
-.tk-nom{text-align:center;font-weight:700;font-size:14px}
-.tk-fiscal{text-align:center;font-size:10px;margin-top:2px}
-.tk-titulo{text-align:center;font-weight:700;margin:2px 0}
-.tk-sep{border-top:1px dashed #000;margin:5px 0}
+/* Ticket para impresora térmica: letra gruesa, grande y negro puro (alto contraste) */
+.tk{width:76mm;margin:0 auto;color:#000;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.45;font-weight:700}
+.tk-logo{display:block;margin:0 auto 6px;max-width:36mm;max-height:36mm;filter:grayscale(1) contrast(1.35)}
+.tk-nom{text-align:center;font-weight:800;font-size:19px}
+.tk-fiscal{text-align:center;font-size:12px;font-weight:600;margin-top:3px}
+.tk-titulo{text-align:center;font-weight:800;font-size:16px;margin:3px 0}
+.tk-sep{border-top:2px solid #000;margin:6px 0}
 .tk-row{display:flex;justify-content:space-between;gap:8px}
-.tk-total{font-weight:700;font-size:14px;border-top:1px solid #000;margin-top:3px;padding-top:3px}
+.tk-total{font-weight:800;font-size:19px;border-top:2px solid #000;margin-top:4px;padding-top:4px}
 .tk-tabla{width:100%;border-collapse:collapse}
-.tk-tabla th{text-align:left;font-size:10px;border-bottom:1px solid #000}
-.tk-tabla td{vertical-align:top;padding:1px 0}
-.tk-tabla .tu{text-align:center;width:26px}
-.tk-tabla .tp{text-align:right;white-space:nowrap;width:64px}
-.tk-pie{text-align:center;margin-top:8px;font-weight:700}
+.tk-tabla th{text-align:left;font-size:12px;font-weight:800;border-bottom:2px solid #000;padding-bottom:2px}
+.tk-tabla td{vertical-align:top;padding:2px 0;font-weight:700}
+.tk-tabla .tu{text-align:center;width:30px}
+.tk-tabla .tp{text-align:right;white-space:nowrap;width:70px}
+.tk-pie{text-align:center;margin-top:10px;font-weight:800;font-size:15px}
 
-.tk .tmod{font-size:10px;font-style:italic;color:#000}
+.tk .tmod{font-size:13px;font-weight:600;color:#000}
 /* comanda */
-.cmd{font-size:14px}
-.cmd-titulo{text-align:center;font-weight:700;font-size:18px;letter-spacing:2px;margin-bottom:4px}
-.cmd-item{display:flex;gap:8px;padding:5px 0;border-bottom:1px dotted #999}
-.cmd-uds{font-weight:700;min-width:28px}
-.cmd-nom{font-weight:700}
-.cmd-mod{font-weight:400;font-style:italic;font-size:12px}
+.cmd{font-size:17px;font-weight:700}
+.cmd-titulo{text-align:center;font-weight:800;font-size:24px;letter-spacing:2px;margin-bottom:5px}
+.cmd-item{display:flex;gap:8px;padding:7px 0;border-bottom:2px solid #000}
+.cmd-uds{font-weight:800;min-width:30px}
+.cmd-nom{font-weight:800}
+.cmd-mod{font-weight:600;font-size:15px}
 
 @media print{
   body>*:not(#ticketPrint){display:none!important}
