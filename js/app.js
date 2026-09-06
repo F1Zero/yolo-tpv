@@ -29,7 +29,11 @@
   // ---------- utilidades ----------
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const money = (n) => '$' + (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+  // dinero con separador de miles (coma) y 2 decimales: $1,234.50
+  const money = (n) => '$' + (Math.round((n + Number.EPSILON) * 100) / 100)
+    .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // entero con separador de miles: 1,234
+  const nfmt = (n) => Math.round(n || 0).toLocaleString('en-US');
   const hoy = () => {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -1191,7 +1195,7 @@
     const xOf = (i) => pad + (i / nX) * (W - pad - 8);
     const yOf = (v) => H - bottom - (v / maxY) * (H - top - bottom);
     const dots = pts.map((p, i) => `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.y).toFixed(1)}" r="3" fill="#157b8a" opacity="0.75"/>`).join('');
-    const gy = [0, 0.5, 1].map((f) => { const v = maxY * f; const y = yOf(v); return `<line x1="${pad}" y1="${y.toFixed(1)}" x2="${W - 8}" y2="${y.toFixed(1)}" stroke="#eef1f4"/><text x="2" y="${(y + 3).toFixed(1)}" font-size="7" fill="#6b7a90">${Math.round(v)}</text>`; }).join('');
+    const gy = [0, 0.5, 1].map((f) => { const v = maxY * f; const y = yOf(v); return `<line x1="${pad}" y1="${y.toFixed(1)}" x2="${W - 8}" y2="${y.toFixed(1)}" stroke="#eef1f4"/><text x="2" y="${(y + 3).toFixed(1)}" font-size="7" fill="#6b7a90">${nfmt(v)}</text>`; }).join('');
     return `<div class="rep-graf"><div class="rep-graf-t">${titulo}</div>
       <svg viewBox="0 0 ${W} ${H}" class="rep-svg" preserveAspectRatio="xMidYMid meet">${gy}
       <line x1="${pad}" y1="${H - bottom}" x2="${W - 8}" y2="${H - bottom}" stroke="#c1c9d3"/>${dots}</svg></div>`;
