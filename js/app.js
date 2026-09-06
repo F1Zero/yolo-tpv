@@ -984,15 +984,7 @@
     return { total, ef, tar, tr, desc, prop, nNotas: cobradas.length, canceladas };
   }
 
-  async function renderCorte() {
-    const f = hoy();
-    $('#corteFecha').textContent = f;
-    const v = await calcVentasDia(f);
-    S._corteVentas = v;
-    const g = await DB.get('cortes', f);
-    $('#corteApertura').value = g ? g.apertura : (await DB.getMeta('apertura_hoy_v', '') || '');
-    $('#corteOtros').value = g ? (g.otros || '') : '';
-    $('#corteMotivo').value = g ? (g.motivo || '') : '';
+  function pintarCorteResumen(v) {
     $('#corteResumen').innerHTML = `
       <div class="row"><span>Notas cobradas</span><b>${v.nNotas}</b></div>
       <div class="row"><span>Total de ventas</span><b>${money(v.total)}</b></div>
@@ -1002,8 +994,39 @@
       <div class="row"><span>Descuentos</span><span>${money(v.desc)}</span></div>
       <div class="row"><span>Propinas</span><span>${money(v.prop)}</span></div>
       <div class="row"><span>Notas canceladas</span><span>${v.canceladas}</span></div>`;
+  }
+
+  async function renderCorte() {
+    const f = hoy();
+    S._corteFecha = f;
+    $('#btnCorteHoy').hidden = true;
+    $('#corteFecha').textContent = f;
+    const v = await calcVentasDia(f);
+    S._corteVentas = v;
+    const g = await DB.get('cortes', f);
+    $('#corteApertura').value = g ? g.apertura : (await DB.getMeta('apertura_hoy_v', '') || '');
+    $('#corteOtros').value = g ? (g.otros || '') : '';
+    $('#corteMotivo').value = g ? (g.motivo || '') : '';
+    pintarCorteResumen(v);
     recalcCorte();
     await renderCorteHist();
+  }
+
+  // Editar un corte ya guardado (carga sus datos en el formulario)
+  async function editarCorteGuardado(fecha) {
+    const c = await DB.get('cortes', fecha);
+    if (!c) return;
+    S._corteFecha = fecha;
+    S._corteVentas = { ef: c.v_efectivo || 0, tar: c.v_tarjeta || 0, tr: c.v_transfer || 0, total: c.total_ventas || 0, desc: c.descuentos || 0, prop: c.propinas || 0, nNotas: c.notas || 0, canceladas: c.canceladas || 0 };
+    $('#corteFecha').textContent = fecha + ' (editando)';
+    $('#btnCorteHoy').hidden = false;
+    $('#corteApertura').value = c.apertura || '';
+    $('#corteOtros').value = c.otros || '';
+    $('#corteMotivo').value = c.motivo || '';
+    pintarCorteResumen(S._corteVentas);
+    recalcCorte();
+    mostrar('corte');
+    window.scrollTo(0, 0);
   }
   function recalcCorte() {
     const ap = parseFloat($('#corteApertura').value) || 0;
@@ -1012,7 +1035,7 @@
     $('#corteEntregar').textContent = money(round2(ap + v.ef - otros));
   }
   async function guardarCorte() {
-    const f = hoy();
+    const f = S._corteFecha || hoy();
     const v = S._corteVentas || await calcVentasDia(f);
     const ap = parseFloat($('#corteApertura').value) || 0;
     const otros = parseFloat($('#corteOtros').value) || 0;
@@ -1023,8 +1046,8 @@
     };
     await DB.put('cortes', corte);
     sync('cortes', 'upsert', corte);
-    await DB.setMeta('apertura_hoy_v', ap);
-    toast('Corte del día guardado');
+    if (f === hoy()) await DB.setMeta('apertura_hoy_v', ap);
+    toast('Corte de ' + f + ' guardado');
     await renderCorteHist();
   }
   // ticket imprimible del corte de caja (recibe un objeto corte -en vivo o guardado-)
@@ -1064,13 +1087,14 @@
     const ap = parseFloat($('#corteApertura').value) || 0;
     const otros = parseFloat($('#corteOtros').value) || 0;
     return {
-      fecha: hoy(), apertura: ap, total_ventas: v.total, v_efectivo: v.ef, v_tarjeta: v.tar, v_transfer: v.tr,
+      fecha: S._corteFecha || hoy(), apertura: ap, total_ventas: v.total, v_efectivo: v.ef, v_tarjeta: v.tar, v_transfer: v.tr,
       descuentos: v.desc, propinas: v.prop, notas: v.nNotas, canceladas: v.canceladas,
       otros, motivo: $('#corteMotivo').value.trim(), entregar: round2(ap + v.ef - otros), updated: Date.now(),
     };
   }
   async function imprimirCorte() {
-    S._corteVentas = await calcVentasDia(hoy());
+    const f = S._corteFecha || hoy();
+    if (f === hoy()) S._corteVentas = await calcVentasDia(f);
     imprimir(corteTicketHTML(corteActual()));
   }
   async function imprimirCorteGuardado(fecha) {
@@ -1087,8 +1111,10 @@
       const row = document.createElement('div');
       row.className = 'ch-row';
       row.innerHTML = `<span class="ch-f">${c.fecha}</span><span>${money(c.total_ventas)}</span><b>${money(c.entregar)}</b>
-        <button class="btn ghost mini" title="Reimprimir">🖨️</button>`;
-      row.querySelector('button').onclick = () => imprimirCorteGuardado(c.fecha);
+        <button class="btn ghost mini" data-a="edit" title="Editar">✏️</button>
+        <button class="btn ghost mini" data-a="print" title="Reimprimir">🖨️</button>`;
+      row.querySelector('[data-a=edit]').onclick = () => editarCorteGuardado(c.fecha);
+      row.querySelector('[data-a=print]').onclick = () => imprimirCorteGuardado(c.fecha);
       cont.appendChild(row);
     }
   }
@@ -1178,6 +1204,31 @@
     const top = Object.entries(agg).sort((a, b) => b[1].uds - a[1].uds).slice(0, 15);
     $('#repTop').innerHTML = '<h3 class="rep-top-t">Productos más vendidos</h3>' + (top.map(([nom, d], i) =>
       `<div class="rep-top-row"><span class="rtn">${i + 1}. ${escapeHtml(nom)}</span><span>${d.uds} uds</span><b>${money(d.importe)}</b></div>`).join('') || '<p class="vacio small">Sin ventas en el rango.</p>');
+  }
+
+  // ---- impresión del reporte en hoja carta (a color, con gráficas) ----
+  function reportePrintHTML() {
+    const rango = ($('#repDesde').value || '') + ' a ' + ($('#repHasta').value || '');
+    return `<div class="rep-print">
+      <div class="rp-head">
+        <img src="${NEGOCIO.logo}" class="rp-logo" onerror="this.style.display='none'">
+        <div>
+          <div class="rp-nom">${escapeHtml(NEGOCIO.nombre)}</div>
+          <div class="rp-sub">Reporte de ventas · ${escapeHtml(rango)}</div>
+        </div>
+      </div>
+      <h3 class="rp-h">Resumen</h3>
+      <div class="rep-resumen">${$('#repResumen').innerHTML}</div>
+      <h3 class="rp-h">Gráficas</h3>
+      <div class="rep-graficas">${$('#repGraficas').innerHTML}</div>
+      <div class="rep-top">${$('#repTop').innerHTML}</div>
+      <div class="rp-pie">${escapeHtml(NEGOCIO.nombre)} · impreso ${fechaTicket(Date.now())}</div>
+    </div>`;
+  }
+  async function imprimirReporte() {
+    await renderReportes();
+    if (!$('#repResumen').innerHTML.trim()) { toast('Genera un reporte primero'); return; }
+    imprimir(reportePrintHTML());
   }
 
   // ============================================================
@@ -1342,7 +1393,9 @@
     $('#corteOtros').oninput = recalcCorte;
     $('#btnGuardarCorte').onclick = guardarCorte;
     $('#btnImprimirCorte').onclick = imprimirCorte;
+    $('#btnCorteHoy').onclick = renderCorte;
     $('#btnRepGenerar').onclick = renderReportes;
+    $('#btnImprimirReporte').onclick = imprimirReporte;
     $$('.rep-quick .chip').forEach((c) => c.onclick = async () => {
       const h = new Date(); const fmt = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       let desde = fmt(h);

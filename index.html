@@ -118,7 +118,8 @@
 
   <!-- ===== Vista: Corte de caja ===== -->
   <main id="viewCorte" class="view" hidden>
-    <div class="view-head"><h1>Corte de caja</h1><span id="corteFecha" class="corte-fecha"></span></div>
+    <div class="view-head"><h1>Corte de caja</h1><span id="corteFecha" class="corte-fecha"></span>
+      <button class="btn ghost mini" id="btnCorteHoy" hidden>← Corte de hoy</button></div>
     <div class="corte-wrap">
       <label class="corte-apertura">Apertura de caja (fondo)
         <input id="corteApertura" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
@@ -155,6 +156,7 @@
         <button class="chip" data-rango="hoy">Hoy</button>
         <button class="chip" data-rango="semana">7 días</button>
         <button class="chip" data-rango="mes">Mes</button>
+        <button class="btn ghost" id="btnImprimirReporte">🖨️ Imprimir (hoja carta)</button>
       </div>
       <div id="repResumen" class="rep-resumen"></div>
       <div id="repGraficas" class="rep-graficas"></div>

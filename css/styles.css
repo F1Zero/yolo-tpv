@@ -230,6 +230,21 @@ dialog::backdrop{background:rgba(15,23,42,.5)}
   @page{margin:4mm}
 }
 
+/* ---------- reporte impreso (hoja carta, a color) ---------- */
+.rep-print{font-family:Arial,Helvetica,sans-serif;color:#111;padding:8mm 6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rep-print *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rp-head{display:flex;align-items:center;gap:14px;border-bottom:3px solid #157b8a;padding-bottom:10px;margin-bottom:14px}
+.rp-logo{width:64px;height:64px;object-fit:contain}
+.rp-nom{font-weight:800;font-size:22px;color:#111}
+.rp-sub{color:#555;font-size:14px;font-weight:600}
+.rp-h{font-weight:800;font-size:16px;margin:16px 0 8px;color:#0f5d69;border-bottom:1px solid #ccc;padding-bottom:4px}
+.rep-print .rep-resumen{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.rep-print .rep-card{border:1px solid #ccc;box-shadow:none}
+.rep-print .rep-graficas{display:grid;grid-template-columns:1fr 1fr;gap:12px;break-inside:avoid}
+.rep-print .rep-graf{border:1px solid #ccc;box-shadow:none;break-inside:avoid}
+.rep-print .rep-top-row{border:1px solid #ddd;box-shadow:none}
+.rp-pie{margin-top:16px;color:#777;font-size:11px;text-align:center;border-top:1px solid #ccc;padding-top:6px}
+
 /* ---------- línea: modificadores ---------- */
 .l-mods{font-size:.72rem;color:var(--teal-d);font-style:italic;margin:.1rem 0}
 .carrito-sec{display:flex;gap:.4rem;padding:.6rem .9rem 0}
