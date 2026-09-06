@@ -610,14 +610,46 @@
     return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${inner}</body></html>`;
   }
 
-  function imprimir(html) {
-    const cont = $('#ticketPrint');
-    cont.innerHTML = html;
-    document.body.classList.add('imprimiendo');
-    const limpiar = () => { document.body.classList.remove('imprimiendo'); window.removeEventListener('afterprint', limpiar); };
-    window.addEventListener('afterprint', limpiar);
-    setTimeout(() => window.print(), 60);
+  // CSS para el ticket térmico (ventana de impresión autónoma)
+  const CSS_TERMICO = `*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#000;font-weight:700}
+    .tk{width:76mm;margin:0 auto;font-size:15px;line-height:1.45}
+    .tk-logo{display:block;margin:0 auto 6px;max-width:34mm;max-height:34mm;filter:grayscale(1) contrast(1.35)}
+    .tk-nom{text-align:center;font-weight:800;font-size:19px}
+    .tk-fiscal{text-align:center;font-size:12px;font-weight:600;margin-top:3px}
+    .tk-titulo{text-align:center;font-weight:800;font-size:16px;margin:3px 0}
+    .tk-sep{border-top:2px solid #000;margin:6px 0}
+    .tk-row{display:flex;justify-content:space-between;gap:8px}
+    .tk-total{font-weight:800;font-size:19px;border-top:2px solid #000;margin-top:4px;padding-top:4px}
+    .tk-tabla{width:100%;border-collapse:collapse}
+    .tk-tabla th{text-align:left;font-size:12px;font-weight:800;border-bottom:2px solid #000;padding-bottom:2px}
+    .tk-tabla td{vertical-align:top;padding:2px 0;font-weight:700}
+    .tk-tabla .tu{text-align:center;width:30px}.tk-tabla .tp{text-align:right;white-space:nowrap;width:70px}
+    .tk .tmod{font-size:13px;font-weight:600}.tk-pie{text-align:center;margin-top:10px;font-weight:800;font-size:15px}
+    .cmd{font-size:17px;font-weight:700}.cmd-titulo{text-align:center;font-weight:800;font-size:24px;letter-spacing:2px;margin-bottom:5px}
+    .cmd-item{display:flex;gap:8px;padding:7px 0;border-bottom:2px solid #000}.cmd-uds{font-weight:800;min-width:30px}.cmd-nom{font-weight:800}.cmd-mod{font-weight:600;font-size:15px}
+    @page{margin:4mm}`;
+
+  // Abre una ventana propia con el contenido y lanza impresión (compatible iOS/PWA/Android/PC)
+  // Se puede pasar una ventana ya abierta (w) para conservar el gesto del usuario tras un await.
+  function imprimirVentana(inner, css, w) {
+    w = w || window.open('', '_blank');
+    if (!w) { toast('Permite ventanas emergentes para imprimir'); return; }
+    const barra = `.barra-imp{position:sticky;top:0;z-index:9;display:flex;gap:8px;align-items:center;background:#157b8a;padding:10px}
+      .barra-imp button{font-size:15px;font-weight:700;padding:9px 16px;border:0;border-radius:8px;background:#fff;color:#157b8a}
+      .barra-imp span{color:#fff;font-size:12px}@media print{.barra-imp{display:none!important}}`;
+    const html = '<!doctype html><html><head><meta charset="utf-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<base href="' + location.href + '"><title>Imprimir</title>'
+      + '<style>' + barra + css + '</style></head><body>'
+      + '<div class="barra-imp"><button onclick="window.print()">🖨️ Imprimir</button>'
+      + '<button onclick="window.close()">Cerrar</button>'
+      + '<span>Si no aparece el diálogo, toca Imprimir.</span></div>'
+      + inner + '</body></html>';
+    w.document.open(); w.document.write(html); w.document.close();
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) { } }, 600);
   }
+
+  function imprimir(html, w) { imprimirVentana(html, CSS_TERMICO, w); }
 
   function imprimirNotaActual() {
     if (!S.notaActual || !S.lineas.length) { toast('La nota está vacía'); return; }
@@ -963,11 +995,12 @@
   }
 
   async function reimprimirNota(nfactura) {
+    const w = window.open('', '_blank');
     const nota = await DB.get('notas', nfactura);
     const lineas = (await DB.byIndex('lineas', 'nfactura', nfactura)).sort((a, b) => a.fecha - b.fecha);
     const pago = await DB.get('pagos', nfactura);
-    if (!nota) return;
-    imprimir(ticketHTML(nota, lineas, pago || null, null));
+    if (!nota) { if (w) w.close(); return; }
+    imprimir(ticketHTML(nota, lineas, pago || null, null), w);
   }
 
   // ============================================================
@@ -1097,13 +1130,15 @@
     };
   }
   async function imprimirCorte() {
+    const w = window.open('', '_blank');
     const f = S._corteFecha || hoy();
     if (f === hoy()) S._corteVentas = await calcVentasDia(f);
-    imprimir(corteTicketHTML(corteActual()));
+    imprimir(corteTicketHTML(corteActual()), w);
   }
   async function imprimirCorteGuardado(fecha) {
+    const w = window.open('', '_blank');
     const c = await DB.get('cortes', fecha);
-    if (c) imprimir(corteTicketHTML(c));
+    if (c) imprimir(corteTicketHTML(c), w); else if (w) w.close();
   }
 
   async function renderCorteHist() {
@@ -1299,7 +1334,10 @@
       svgDispersion(pts, 'Dispersión de tickets ($/nota)') +
       svgCajas(grupos, 'Distribución por día (caja)') +
       svgAnillo(top5, 'Top 5 productos (anillo)');
-    $('#repTop').innerHTML = '';
+    // lista top 8 debajo
+    const top8 = Object.entries(agg).sort((a, b) => b[1].uds - a[1].uds).slice(0, 8);
+    $('#repTop').innerHTML = '<h3 class="rep-top-t">Productos más vendidos</h3>' + (top8.map(([nom, d], i) =>
+      `<div class="rep-top-row"><span class="rtn">${i + 1}. ${escapeHtml(nom)}</span><span>${d.uds} uds</span><b>${money(d.importe)}</b></div>`).join('') || '<p class="vacio small">Sin ventas en el rango.</p>');
   }
 
   // ---- impresión del reporte en hoja carta (a color, con gráficas) ----
@@ -1321,10 +1359,35 @@
       <div class="rp-pie">${escapeHtml(NEGOCIO.nombre)} · impreso ${fechaTicket(Date.now())}</div>
     </div>`;
   }
+  // CSS para el reporte en hoja carta (a color)
+  const CSS_REPORTE = `*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#111}
+    .rep-print{padding:6mm 5mm}
+    .rp-head{display:flex;align-items:center;gap:14px;border-bottom:3px solid #157b8a;padding-bottom:10px;margin-bottom:14px}
+    .rp-logo{width:64px;height:64px;object-fit:contain}
+    .rp-nom{font-weight:800;font-size:22px}.rp-sub{color:#555;font-size:14px;font-weight:600}
+    .rp-h{font-weight:800;font-size:16px;margin:16px 0 8px;color:#0f5d69;border-bottom:1px solid #ccc;padding-bottom:4px}
+    .rep-resumen{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .rep-card{border:1px solid #ccc;border-radius:10px;padding:8px 10px;display:flex;flex-direction:column}
+    .rep-card span{color:#666;font-size:11px}.rep-card b{font-size:18px}
+    .rep-graficas{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .rep-graf{border:1px solid #ccc;border-radius:10px;padding:8px;break-inside:avoid}
+    .rep-graf-t{font-weight:800;font-size:13px;margin-bottom:6px;color:#333}
+    .rep-svg{width:100%;height:auto;display:block}.rg-leg{font-size:11px;font-weight:700}
+    .an-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.an-svg{width:130px;height:130px}
+    .an-legs{flex:1;min-width:120px}.an-leg{display:flex;align-items:center;gap:6px;font-size:12px}
+    .an-dot{width:11px;height:11px;border-radius:3px}.an-nom{flex:1}.an-leg b{color:#157b8a}
+    .rep-top-t{font-weight:800;font-size:15px;margin:14px 0 6px;color:#0f5d69}
+    .rep-top-row{display:flex;justify-content:space-between;gap:8px;border:1px solid #ddd;border-radius:8px;padding:6px 8px;font-size:13px;margin-bottom:4px}
+    .rep-top-row .rtn{flex:1}.rep-top-row b{color:#157b8a}
+    .rp-pie{margin-top:16px;color:#777;font-size:11px;text-align:center;border-top:1px solid #ccc;padding-top:6px}
+    .vacio{color:#888;text-align:center;padding:1rem}
+    @page{margin:8mm}`;
   async function imprimirReporte() {
+    const w = window.open('', '_blank');
     await renderReportes();
-    if (!$('#repResumen').innerHTML.trim()) { toast('Genera un reporte primero'); return; }
-    imprimir(reportePrintHTML());
+    if (!$('#repResumen').innerHTML.trim()) { toast('Genera un reporte primero'); if (w) w.close(); return; }
+    imprimirVentana(reportePrintHTML(), CSS_REPORTE, w);
   }
 
   // ============================================================
