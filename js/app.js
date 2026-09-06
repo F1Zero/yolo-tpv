@@ -1157,6 +1157,96 @@
     }).join('');
     return `<div class="rep-graf"><div class="rep-graf-t">${titulo}</div><div class="hb-wrap">${rows}</div></div>`;
   }
+  // Barras + línea de tendencia (regresión lineal)
+  function svgBarrasTendencia(serie, titulo) {
+    const W = 340, H = 180, pad = 24, bottom = 28, top = 14;
+    const max = Math.max(1, ...serie.map((s) => s.val));
+    const n = serie.length, gap = (W - pad * 2) / n, bw = gap * 0.6;
+    const step = n <= 12 ? 1 : Math.ceil(n / 12);
+    const yOf = (v) => H - bottom - (v / max) * (H - top - bottom);
+    const xOf = (i) => pad + gap * i + gap / 2;
+    // regresión lineal y = a + b x
+    let sx = 0, sy = 0, sxy = 0, sxx = 0;
+    serie.forEach((s, i) => { sx += i; sy += s.val; sxy += i * s.val; sxx += i * i; });
+    const b = n > 1 ? (n * sxy - sx * sy) / (n * sxx - sx * sx) : 0;
+    const a = (sy - b * sx) / n;
+    const bars = serie.map((s, i) => {
+      const x = pad + gap * i + (gap - bw) / 2, y = yOf(s.val);
+      const lbl = (i % step === 0) ? `<text x="${xOf(i).toFixed(1)}" y="${H - bottom + 12}" font-size="8" text-anchor="middle" fill="#6b7a90">${s.etq}</text>` : '';
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, H - bottom - y).toFixed(1)}" rx="2" fill="#157b8a"/>${lbl}`;
+    }).join('');
+    const p1 = `${xOf(0).toFixed(1)},${yOf(a).toFixed(1)}`;
+    const p2 = `${xOf(n - 1).toFixed(1)},${yOf(a + b * (n - 1)).toFixed(1)}`;
+    const trend = `<line x1="${p1.split(',')[0]}" y1="${p1.split(',')[1]}" x2="${p2.split(',')[0]}" y2="${p2.split(',')[1]}" stroke="#d9534f" stroke-width="2.2" stroke-dasharray="5 3"/>`;
+    return `<div class="rep-graf"><div class="rep-graf-t">${titulo} <span class="rg-leg" style="color:#d9534f">— tendencia</span></div>
+      <svg viewBox="0 0 ${W} ${H}" class="rep-svg" preserveAspectRatio="xMidYMid meet">
+      <line x1="${pad}" y1="${H - bottom}" x2="${W - pad}" y2="${H - bottom}" stroke="#c1c9d3"/>${bars}${trend}</svg></div>`;
+  }
+  // Dispersión: cada punto es una nota (x = orden cronológico, y = importe)
+  function svgDispersion(pts, titulo) {
+    const W = 340, H = 180, pad = 30, bottom = 24, top = 12;
+    if (!pts.length) return `<div class="rep-graf"><div class="rep-graf-t">${titulo}</div><p class="vacio small">Sin datos.</p></div>`;
+    const maxY = Math.max(1, ...pts.map((p) => p.y));
+    const nX = Math.max(1, pts.length - 1);
+    const xOf = (i) => pad + (i / nX) * (W - pad - 8);
+    const yOf = (v) => H - bottom - (v / maxY) * (H - top - bottom);
+    const dots = pts.map((p, i) => `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.y).toFixed(1)}" r="3" fill="#157b8a" opacity="0.75"/>`).join('');
+    const gy = [0, 0.5, 1].map((f) => { const v = maxY * f; const y = yOf(v); return `<line x1="${pad}" y1="${y.toFixed(1)}" x2="${W - 8}" y2="${y.toFixed(1)}" stroke="#eef1f4"/><text x="2" y="${(y + 3).toFixed(1)}" font-size="7" fill="#6b7a90">${Math.round(v)}</text>`; }).join('');
+    return `<div class="rep-graf"><div class="rep-graf-t">${titulo}</div>
+      <svg viewBox="0 0 ${W} ${H}" class="rep-svg" preserveAspectRatio="xMidYMid meet">${gy}
+      <line x1="${pad}" y1="${H - bottom}" x2="${W - 8}" y2="${H - bottom}" stroke="#c1c9d3"/>${dots}</svg></div>`;
+  }
+  function _cuantil(sorted, q) {
+    if (!sorted.length) return 0;
+    const pos = (sorted.length - 1) * q, base = Math.floor(pos), rest = pos - base;
+    return sorted[base + 1] !== undefined ? sorted[base] + rest * (sorted[base + 1] - sorted[base]) : sorted[base];
+  }
+  // Cajas (box plot) por día: distribución de importes de ticket
+  function svgCajas(grupos, titulo) {
+    const W = 340, H = 190, pad = 30, bottom = 30, top = 12;
+    const keys = grupos.map((g) => g.etq);
+    const allMax = Math.max(1, ...grupos.map((g) => Math.max(...g.vals)));
+    const n = grupos.length, gap = (W - pad - 8) / n, bw = Math.min(26, gap * 0.5);
+    const yOf = (v) => H - bottom - (v / allMax) * (H - top - bottom);
+    const boxes = grupos.map((g, i) => {
+      const s = [...g.vals].sort((a, b) => a - b);
+      if (!s.length) return '';
+      const q1 = _cuantil(s, .25), md = _cuantil(s, .5), q3 = _cuantil(s, .75), mn = s[0], mx = s[s.length - 1];
+      const cx = pad + gap * i + gap / 2;
+      const x = cx - bw / 2;
+      return `<line x1="${cx}" y1="${yOf(mn).toFixed(1)}" x2="${cx}" y2="${yOf(mx).toFixed(1)}" stroke="#4f5f7a"/>
+        <line x1="${cx - 5}" y1="${yOf(mx).toFixed(1)}" x2="${cx + 5}" y2="${yOf(mx).toFixed(1)}" stroke="#4f5f7a"/>
+        <line x1="${cx - 5}" y1="${yOf(mn).toFixed(1)}" x2="${cx + 5}" y2="${yOf(mn).toFixed(1)}" stroke="#4f5f7a"/>
+        <rect x="${x.toFixed(1)}" y="${yOf(q3).toFixed(1)}" width="${bw}" height="${Math.max(1, yOf(q1) - yOf(q3)).toFixed(1)}" fill="#89aeb9" stroke="#157b8a"/>
+        <line x1="${x.toFixed(1)}" y1="${yOf(md).toFixed(1)}" x2="${(x + bw).toFixed(1)}" y2="${yOf(md).toFixed(1)}" stroke="#0f5d69" stroke-width="2"/>
+        <text x="${cx}" y="${H - bottom + 12}" font-size="8" text-anchor="middle" fill="#6b7a90">${g.etq}</text>`;
+    }).join('');
+    return `<div class="rep-graf"><div class="rep-graf-t">${titulo}</div>
+      <svg viewBox="0 0 ${W} ${H}" class="rep-svg" preserveAspectRatio="xMidYMid meet">
+      <line x1="${pad}" y1="${H - bottom}" x2="${W - 8}" y2="${H - bottom}" stroke="#c1c9d3"/>${boxes}</svg></div>`;
+  }
+  // Anillo (donut) top 5 productos
+  function svgAnillo(items, titulo) {
+    const cols = ['#157b8a', '#6198a8', '#89aeb9', '#4f5f7a', '#c1c9d3'];
+    const tot = items.reduce((s, it) => s + it.val, 0) || 1;
+    const r = 52, cx = 70, cy = 70, C = 2 * Math.PI * r;
+    let off = 0;
+    const arcs = items.map((it, i) => {
+      const frac = it.val / tot, dash = frac * C;
+      const seg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cols[i % cols.length]}" stroke-width="20" stroke-dasharray="${dash.toFixed(2)} ${(C - dash).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+      off += dash; return seg;
+    }).join('');
+    const leg = items.map((it, i) =>
+      `<div class="an-leg"><span class="an-dot" style="background:${cols[i % cols.length]}"></span><span class="an-nom">${escapeHtml(it.label)}</span><b>${it.val} uds</b></div>`).join('');
+    return `<div class="rep-graf"><div class="rep-graf-t">${titulo}</div>
+      <div class="an-wrap">
+        <svg viewBox="0 0 140 140" class="an-svg">${arcs}
+          <text x="70" y="66" font-size="13" font-weight="800" text-anchor="middle" fill="#111">${tot}</text>
+          <text x="70" y="82" font-size="9" text-anchor="middle" fill="#6b7a90">uds top 5</text></svg>
+        <div class="an-legs">${leg || '<p class="vacio small">Sin datos.</p>'}</div>
+      </div></div>`;
+  }
+
   async function renderReportes() {
     const desde = $('#repDesde').value, hasta = $('#repHasta').value;
     if (!desde || !hasta) return;
@@ -1178,32 +1268,34 @@
       <div class="rep-card"><span>📲 Transfer.</span><b>${money(tr)}</b></div>
       <div class="rep-card"><span>Propinas</span><b>${money(prop)}</b></div>
       <div class="rep-card"><span>Descuentos</span><b>${money(desc)}</b></div>`;
-    // ---- gráficas ----
-    // ventas por día en el rango
-    const porDia = {};
-    for (const n of cobradas) { const p = pById[n.nfactura]; if (!p) continue; porDia[n.fecha] = (porDia[n.fecha] || 0) + (p.total || 0); }
+    // ---- datos para gráficas ----
     const dias = rangoFechas(desde, hasta);
+    const porDia = {}, porDiaArr = {};
+    const notasOrden = [...cobradas].sort((a, b) => (a.fecha === b.fecha ? a.nfactura - b.nfactura : (a.fecha < b.fecha ? -1 : 1)));
+    const pts = [];
+    for (const n of notasOrden) {
+      const p = pById[n.nfactura]; const t = p ? (p.total || 0) : (n.total || 0);
+      porDia[n.fecha] = (porDia[n.fecha] || 0) + t;
+      (porDiaArr[n.fecha] = porDiaArr[n.fecha] || []).push(t);
+      pts.push({ y: t });
+    }
     const serie = dias.map((d) => ({ etq: d.slice(5), val: porDia[d] || 0 }));
-    const gDia = serie.length > 1
-      ? svgBarras(serie, 'Ventas por día')
-      : `<div class="rep-graf"><div class="rep-graf-t">Ventas del día</div><div class="rep-1dia">${money(total)}</div></div>`;
-    const gMet = svgBarrasH([
-      { etq: 'Efectivo', val: ef, col: '#2e9e6b' },
-      { etq: 'Tarjeta', val: tar, col: '#157b8a' },
-      { etq: 'Transferencia', val: tr, col: '#6198a8' },
-    ], 'Ventas por método');
-    $('#repGraficas').innerHTML = gDia + gMet;
-
-    // top productos por unidades
+    const grupos = dias.filter((d) => porDiaArr[d] && porDiaArr[d].length).map((d) => ({ etq: d.slice(5), vals: porDiaArr[d] }));
+    // top 5 productos por unidades (para el anillo)
     const agg = {};
     for (const l of lineas) {
       if (!setNf.has(l.nfactura)) continue;
       if (!agg[l.item]) agg[l.item] = { uds: 0, importe: 0 };
       agg[l.item].uds += l.uds; agg[l.item].importe += l.importe;
     }
-    const top = Object.entries(agg).sort((a, b) => b[1].uds - a[1].uds).slice(0, 15);
-    $('#repTop').innerHTML = '<h3 class="rep-top-t">Productos más vendidos</h3>' + (top.map(([nom, d], i) =>
-      `<div class="rep-top-row"><span class="rtn">${i + 1}. ${escapeHtml(nom)}</span><span>${d.uds} uds</span><b>${money(d.importe)}</b></div>`).join('') || '<p class="vacio small">Sin ventas en el rango.</p>');
+    const top5 = Object.entries(agg).sort((a, b) => b[1].uds - a[1].uds).slice(0, 5).map(([nom, d]) => ({ label: nom, val: d.uds }));
+
+    $('#repGraficas').innerHTML =
+      svgBarrasTendencia(serie, 'Ventas por día') +
+      svgDispersion(pts, 'Dispersión de tickets ($/nota)') +
+      svgCajas(grupos, 'Distribución por día (caja)') +
+      svgAnillo(top5, 'Top 5 productos (anillo)');
+    $('#repTop').innerHTML = '';
   }
 
   // ---- impresión del reporte en hoja carta (a color, con gráficas) ----
