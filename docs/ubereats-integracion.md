@@ -67,9 +67,12 @@ Suscribe el evento de pedidos (p. ej. `orders.notification`).
 1. **Mapeo del pedido**: los nombres de campos (`cart.items`, precios, dirección,
    total) están puestos de forma defensiva. Con el `ORDER RAW` del primer pedido los
    ajustamos exacto. Los precios se asumen en **centavos** (heurística en `_money`).
-2. **Endpoints/scopes**: `listStoresUber` y `_getUberOrder` usan rutas documentadas;
-   confirmarlas contra el sandbox. El token pide scopes
-   `eats.pos_provisioning eats.store eats.order` (ajustar según lo concedido).
+2. **Endpoints/scopes** (verificados con la doc oficial 2026): token siempre a
+   `https://auth.uber.com/oauth/v2/token` (sandbox solo cambia apiBase a
+   `test-api.uber.com`). Scopes: leer pedido `eats.store.orders.read`, aceptar
+   `eats.order` (default ya corregido). Si Uber solo te concedió
+   `eats.pos_provisioning`, pide que te habiliten también los de orders para leer/aceptar.
+   `listStoresUber` puede requerir otro scope; si falla, toma el Store ID desde Uber Eats Manager.
 3. **Firma del webhook**: Apps Script **no expone headers**, así que la firma
    `X-Uber-Signature` no se valida aquí. Protección actual: el secreto `uk` en la URL.
    Endurecimiento futuro: un relay (Cloudflare Worker) que valide el HMAC y reenvíe.
