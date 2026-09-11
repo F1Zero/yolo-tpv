@@ -102,9 +102,19 @@
     },
     async setMeta(clave, valor) { return this.put('meta', { clave, valor }); },
     // Folio consecutivo de nota (nfactura). Inicia donde quedo AppSheet.
+    // Anti-colisión (integración Uber, Opción A): nunca reutiliza un nfactura
+    // ya visto. Toma el máximo entre el contador local y el mayor nfactura
+    // presente en 'notas' (que incluye los pedidos Uber bajados por sync).
     async nextFolio() {
-      const actual = await this.getMeta('folio', 0);
-      const nuevo = actual + 1;
+      let base = await this.getMeta('folio', 0);
+      try {
+        const notas = await this.all('notas');
+        for (const n of notas) {
+          const f = Number(n && n.nfactura) || 0;
+          if (f > base) base = f;
+        }
+      } catch (e) { /* si falla, usa el contador local */ }
+      const nuevo = base + 1;
       await this.setMeta('folio', nuevo);
       return nuevo;
     },

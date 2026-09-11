@@ -19,7 +19,9 @@ var TABLAS = {
   notas:     { key: 'nfactura', cols: ['nfactura','fecha','mesa','atendio','estado','subtotal','iva','desc_pct','descuento','total','metodo','updated'] },
   ventas:    { key: 'id', cols: ['id','nfactura','iditem','item','uds','precio','importe','estado','fecha','updated'] },
   pagos:     { key: 'nfactura', cols: ['nfactura','metodo','efectivo','tarjeta','transferencia','recibido_efectivo','cambio','propina_pct','propina','desc_pct','descuento','total','due','fecha'] },
-  cortes:    { key: 'fecha', cols: ['fecha','apertura','total_ventas','v_efectivo','v_tarjeta','v_transfer','descuentos','entregar','otros','motivo','canceladas','updated'] }
+  cortes:    { key: 'fecha', cols: ['fecha','apertura','total_ventas','v_efectivo','v_tarjeta','v_transfer','descuentos','entregar','otros','motivo','canceladas','updated'] },
+  // Extras de pedidos Uber Eats (la escribe UberEats.gs; el TPV la ignora al hacer pull)
+  ubereats:  { key: 'order_id', cols: ['order_id','nfactura','cliente','telefono','direccion','tipo_entrega','notas','estatus_uber','total','creado','updated'] }
 };
 
 function _ss() { return SpreadsheetApp.getActive(); }
@@ -157,6 +159,8 @@ function guardarPDF(nfactura, html) {
 
 // POST: body JSON {token, cambios:[...]} y/o {token, pdf:{nfactura, html}}
 function doPost(e) {
+  // Webhook de Uber Eats: llega como <URL>/exec?src=uber&uk=<secreto> (ver UberEats.gs)
+  if (e && e.parameter && e.parameter.src === 'uber') return uberWebhook_(e);
   var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return _json({ ok: false, error: 'json' }); }
   if (!body || body.token !== TOKEN) return _json({ ok: false, error: 'token' });
